@@ -1,13 +1,17 @@
 import os
 import json
 import time
+import html
+import traceback
+import concurrent.futures
+import requests
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 
 import sys
 # Make sure we can import core from parent dir
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.ocr_engine import process_pdf
+from core.ocr_engine import process_pdf, segment_answers_with_gemini
 from core.evaluation_engine import HandwrittenEvaluator
 from core.scheme_parser import SchemeParser
 
@@ -32,13 +36,14 @@ scheme_parser = SchemeParser()
 def index():
     return render_template('index.html')
 
-@app.route('/api/grade', methods=['POST'])
-def grade_exam():
+@app.route('/api/extract', methods=['POST'])
+def extract_text():
     if 'scheme' not in request.files or 'student_pdf' not in request.files:
         return jsonify({'error': 'Missing files'}), 400
         
     scheme_file = request.files['scheme']
     student_file = request.files['student_pdf']
+    grading_mode = request.form.get('grading_mode', 'experienced')
     
     if scheme_file.filename == '' or student_file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
@@ -62,44 +67,123 @@ def grade_exam():
         if ocr_text.startswith("ERROR"):
             return jsonify({'error': ocr_text}), 500
             
-        # Step 3: Evaluate each question
-        results = []
+        return jsonify({
+            'success': True,
+            'ocr_text': ocr_text,
+            'questions': questions,
+            'grading_mode': grading_mode
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/evaluate', methods=['POST'])
+def evaluate_exam():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No JSON payload provided'}), 400
+            
+        ocr_text = data.get('ocr_text')
+        questions = data.get('questions')
+        grading_mode = data.get('grading_mode', 'experienced')
+        exam_max_override = data.get('exam_max_marks')
+        
+        if not ocr_text or not questions:
+            return jsonify({'error': 'Missing ocr_text or questions in payload'}), 400
+            
+        # Step 3: Segment Answers
+        print("Segmenting Answers with Gemini...")
+        segmented_answers = segment_answers_with_gemini(ocr_text, questions)
+        
+        # Step 4: Evaluate each question
+        results = [None] * len(questions)
         total_score = 0
         total_max = 0
         
         print("Starting Evaluation Pipeline...")
-        for i, q in enumerate(questions):
+        
+        def evaluate_question(args):
+            i, q = args
             q_safe = q.get('question', '...').encode('ascii', 'ignore').decode()
             print(f"Evaluating Q{i+1}: {q_safe}")
             
             q_text = q.get('question', '')
             ideal = q.get('answer', '')
-            max_m = q.get('max_marks', 10)
-            ans_type = q.get('type', 'flexible')
-            min_len = q.get('min_length', None)
+            max_m = int(q.get('max_marks', 10))
+            ans_type = q.get('type', 'flexible').lower()
+            min_length = q.get('min_length', None)
+            
+            q_key = str(q.get('id', str(i+1))).strip()
+            
+            # Robust fuzzy matching for LLM hallucinated keys
+            student_ans = segmented_answers.get(q_key)
+            if not student_ans:
+                student_ans = segmented_answers.get(f"Q{q_key}")
+            if not student_ans:
+                student_ans = segmented_answers.get(q_key.replace("Q", ""))
+            if not student_ans:
+                for k, v in segmented_answers.items():
+                    if str(k).lower().strip('q') == q_key.lower().strip('q'):
+                        student_ans = v
+                        break
+                        
+            student_ans = (student_ans or "").strip()
+            
+            if not student_ans or len(student_ans) < 5:
+                return i, {
+                    'q_num': i+1,
+                    'question': q_text,
+                    'max_marks': max_m,
+                    'type': ans_type.upper(),
+                    'score': 0,
+                    'reasoning': 'The student did not attempt this question.',
+                    'match': 0,
+                    'penalty': 0,
+                    'extracted_answer': 'Not Attempted'
+                }, max_m
             
             eval_result = evaluator.evaluate(
                 question=q_text,
                 ideal_rubric=ideal,
+                ocr_text=student_ans,
                 max_marks=max_m,
-                ocr_text=ocr_text, # passing the entire sheet for simplicity; in prod, you'd segment it
                 ans_type=ans_type,
-                min_length=min_len
+                components=q.get('components', {}),
+                min_length=min_length,
+                grading_mode=grading_mode
             )
             
-            total_score += eval_result['score']
-            total_max += max_m
-            
-            results.append({
+            return i, {
                 'q_num': i + 1,
                 'question': q_text,
                 'max_marks': max_m,
                 'type': ans_type.upper(),
                 'score': eval_result['score'],
-                'reasoning': eval_result['reasoning'],
+                'reasoning': html.escape(eval_result['reasoning']),
+                'trace': eval_result.get('trace', []),
                 'match': eval_result['match_percentage'],
-                'penalty': eval_result['penalty']
-            })
+                'penalty': eval_result['penalty'],
+                'extracted_answer': html.escape(student_ans)
+            }, max_m
+            
+        # Process sequentially to prevent Ollama from crashing the laptop
+        for i, q in enumerate(questions):
+            idx, res, max_m = evaluate_question((i, q))
+            results[idx] = res
+            total_score += res['score']
+            total_max += max_m
+
+        # ==========================================================
+        # No more LLaMA-3 Batching! Purely FAKR logic handled above.
+        # ==========================================================
+            
+        # Override total_max if provided via UI
+        if exam_max_override and str(exam_max_override).strip():
+            try:
+                total_max = int(str(exam_max_override).strip())
+            except ValueError:
+                pass
             
         return jsonify({
             'success': True,
