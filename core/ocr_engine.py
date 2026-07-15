@@ -85,6 +85,10 @@ def process_pdf(pdf_path: str) -> str:
             pix = doc[i].get_pixmap(matrix=fitz.Matrix(1.0, 1.0))
             # Convert to PIL Image
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            # Resize image for extremely fast Gemini API upload (max width 1024)
+            if img.width > 1024:
+                ratio = 1024 / img.width
+                img = img.resize((1024, int(img.height * ratio)), Image.Resampling.LANCZOS)
             images.append(img)
             
         print(f"Sending {len(images)} pages to Gemini in a single multi-modal request...")

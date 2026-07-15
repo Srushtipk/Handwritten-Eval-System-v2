@@ -167,16 +167,34 @@ def evaluate_exam():
                 'extracted_answer': html.escape(student_ans)
             }, max_m
             
-        # Process sequentially to prevent Ollama from crashing the laptop
+        # Process sequentially
+        batch_data = []
         for i, q in enumerate(questions):
             idx, res, max_m = evaluate_question((i, q))
             results[idx] = res
             total_score += res['score']
             total_max += max_m
+            
+            # Prepare data for batched LLaMA reasoning
+            batch_data.append({
+                "q_num": res['q_num'],
+                "question": res['question'],
+                "ideal": q.get('answer', ''),
+                "student": res.get('extracted_answer', ''),
+                "max_marks": res['max_marks'],
+                "score": res['score']
+            })
 
         # ==========================================================
-        # No more LLaMA-3 Batching! Purely FAKR logic handled above.
+        # MASSIVE BATCHING: Generate all reasoning in 1 API call
         # ==========================================================
+        print(f"Generating batched LLaMA reasoning for {len(batch_data)} questions...")
+        if evaluator:
+            batched_reasoning = evaluator.batch_generate_reasoning(batch_data, grading_mode)
+            for res in results:
+                q_num_str = str(res['q_num'])
+                if q_num_str in batched_reasoning:
+                    res['reasoning'] = html.escape(batched_reasoning[q_num_str])
             
         # Override total_max if provided via UI
         if exam_max_override and str(exam_max_override).strip():

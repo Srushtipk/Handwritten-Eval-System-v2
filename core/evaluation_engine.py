@@ -44,22 +44,35 @@ class HandwrittenEvaluator:
                 
         return raw_score
 
-    def _generate_llama_reasoning(self, question, ideal_rubric, student_answer, max_marks, awarded_marks, grading_mode):
+    def batch_generate_reasoning(self, batch_data: list, grading_mode: str) -> dict:
+        if not batch_data: return {}
+            
+        context_block = ""
+        for item in batch_data:
+            context_block += f"\n--- QUESTION {item['q_num']} ---\n"
+            context_block += f"TOPIC: {item['question']}\n"
+            context_block += f"TEACHER RUBRIC: {item['ideal']}\n"
+            context_block += f"STUDENT ANSWER: {item['student']}\n"
+            context_block += f"MATH SCORE AWARDED: {item['score']} / {item['max_marks']}\n"
+            
         prompt = f"""
-You are a constructive AI teaching assistant explaining a grade to a student.
+You are a constructive AI teaching assistant explaining grades to a student.
+A highly accurate mathematical engine has already graded the student's exam. 
 
-QUESTION: {question}
-TEACHER'S RUBRIC: {ideal_rubric}
-STUDENT'S ANSWER: {student_answer}
+Here are the questions, rubrics, student answers, and the Math Scores awarded:
+{context_block}
 
-The mathematical grading engine has already evaluated this answer and awarded it {awarded_marks} out of {max_marks} marks.
-{ 'The engine was lenient, rewarding conceptual understanding.' if grading_mode == 'lenient' else 'The engine was strict, deducting marks for missing core concepts.' }
+{ 'The math engine was lenient, rewarding conceptual understanding.' if grading_mode == 'lenient' else 'The math engine was strict, deducting marks for missing core concepts.' }
 
-Write a single, highly professional 2-sentence paragraph addressed directly to the student. Explain exactly why they received {awarded_marks}/{max_marks} based on what they got right and what was missing from the rubric. 
+For EACH question, write a single, highly professional 2-sentence paragraph addressed directly to the student. Explain exactly why they received their specific math score based on what they got right and what was missing from the rubric. 
 Never insult the student. Do not dispute the mathematical grade.
 
-Return a STRICT JSON object with exactly one key:
-"reasoning": "your 2-sentence paragraph here"
+You MUST return a STRICT JSON object mapping the Question Number (as a string) to your reasoning paragraph.
+Example Format:
+{{
+    "1": "Your reasoning for question 1...",
+    "2": "Your reasoning for question 2..."
+}}
 
 Do not include markdown blocks or any other text outside the JSON.
 """
@@ -69,18 +82,18 @@ Do not include markdown blocks or any other text outside the JSON.
                 "prompt": prompt,
                 "stream": False,
                 "format": "json"
-            }, timeout=120)
+            }, timeout=300)
             
             res_json = response.json()
             llm_output = res_json.get('response', '{}')
             llm_output = llm_output.replace('```json', '').replace('```', '').strip()
             data = json.loads(llm_output)
             
-            return str(data.get('reasoning', f"Your answer scored {awarded_marks}/{max_marks} based on semantic similarity to the rubric."))
+            return data
             
         except Exception as e:
             print(f"Error calling LLaMA API: {e}")
-            return f"Your answer scored {awarded_marks}/{max_marks} based on semantic similarity to the rubric."
+            return {}
 
     def evaluate(self, ideal_rubric: str, ocr_text: str, max_marks: int, ans_type: str, components: dict = None, min_length: str = None, grading_mode: str = 'experienced', question: str = '') -> dict:
         if not ocr_text or len(ocr_text.strip()) < 5:
@@ -102,8 +115,8 @@ Do not include markdown blocks or any other text outside the JSON.
                 length_penalty = 0.2
                 score = max(0, int(round((raw_percentage - length_penalty) * max_marks)))
         
-        # 3. LLaMA Reasoning Generation
-        reasoning = self._generate_llama_reasoning(question, ideal_rubric, ocr_text, max_marks, score, grading_mode)
+        # 3. Skip LLaMA Reasoning Generation (Will be batched later)
+        reasoning = f"Your answer scored {score}/{max_marks} based on semantic similarity to the rubric."
         
         # Build Trace
         trace = []
