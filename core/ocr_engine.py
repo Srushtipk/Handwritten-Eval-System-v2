@@ -35,8 +35,8 @@ def extract_text_with_gemini(images: list) -> str:
         )
 
         
-        # Fallback cascade: Use correct Gemini 1.5 models
-        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro']
+        # Fallback cascade: Use correct Gemini 1.5 models (Pro is not supported in all free tier regions)
+        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-flash-8b']
         last_e = None
         
         for model_name in models_to_try:
@@ -138,7 +138,7 @@ def segment_answers_with_gemini(raw_text: str, questions_list: list) -> dict:
             f"--- RAW OCR TEXT ---\n{raw_text}"
         )
         
-        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro']
+        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-flash-8b']
         last_e = None
         text = ""
         
