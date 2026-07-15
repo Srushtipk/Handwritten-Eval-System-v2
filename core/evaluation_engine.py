@@ -44,57 +44,39 @@ class HandwrittenEvaluator:
                 
         return raw_score
 
-    def batch_generate_reasoning(self, batch_data: list, grading_mode: str) -> dict:
-        if not batch_data: return {}
-            
-        context_block = ""
-        for item in batch_data:
-            context_block += f"\n--- QUESTION {item['q_num']} ---\n"
-            context_block += f"TOPIC: {item['question']}\n"
-            context_block += f"TEACHER RUBRIC: {item['ideal']}\n"
-            context_block += f"STUDENT ANSWER: {item['student']}\n"
-            context_block += f"MATH SCORE AWARDED: {item['score']} / {item['max_marks']}\n"
-            
+    def _generate_llama_reasoning(self, ideal_rubric, student_answer, max_marks, awarded_marks, grading_mode):
         prompt = f"""
-You are a constructive AI teaching assistant explaining grades to a student.
-A highly accurate mathematical engine has already graded the student's exam. 
+You are an AI assistant. The mathematical engine awarded this answer {awarded_marks}/{max_marks} marks.
+Write exactly ONE short sentence (max 15 words) addressed to the student explaining why they got this score based on the rubric.
+Be encouraging.
 
-Here are the questions, rubrics, student answers, and the Math Scores awarded:
-{context_block}
+TEACHER RUBRIC: {ideal_rubric[:300]}
+STUDENT ANSWER: {student_answer[:300]}
 
-{ 'The math engine was lenient, rewarding conceptual understanding.' if grading_mode == 'lenient' else 'The math engine was strict, deducting marks for missing core concepts.' }
-
-For EACH question, write ONLY ONE SHORT SENTENCE addressed directly to the student explaining why they received their math score.
-CRITICAL LIMIT: Maximum 15 words per sentence. Be extremely concise to speed up generation!
-Never insult the student. Do not dispute the mathematical grade.
-
-You MUST return a STRICT JSON object mapping the Question Number (as a string) to your reasoning paragraph.
-Example Format:
-{{
-    "1": "Your reasoning for question 1...",
-    "2": "Your reasoning for question 2..."
-}}
-
-Do not include markdown blocks or any other text outside the JSON.
+Return a JSON object: {{"reasoning": "your short sentence"}}
 """
         try:
+            # STRICT 15 SECOND TIMEOUT to prevent freezing on local hardware!
             response = requests.post(self.api_url, json={
                 "model": self.model_name,
                 "prompt": prompt,
                 "stream": False,
                 "format": "json"
-            }, timeout=300)
+            }, timeout=15)
             
             res_json = response.json()
             llm_output = res_json.get('response', '{}')
             llm_output = llm_output.replace('```json', '').replace('```', '').strip()
             data = json.loads(llm_output)
             
-            return data
+            return str(data.get('reasoning', f"Your answer scored {awarded_marks}/{max_marks} based on semantic similarity to the rubric."))
             
+        except requests.exceptions.Timeout:
+            print("LLaMA API timed out! Falling back to standard response to prevent freezing.")
+            return f"Your answer scored {awarded_marks}/{max_marks} based on semantic similarity to the rubric."
         except Exception as e:
             print(f"Error calling LLaMA API: {e}")
-            return {}
+            return f"Your answer scored {awarded_marks}/{max_marks} based on semantic similarity to the rubric."
 
     def evaluate(self, ideal_rubric: str, ocr_text: str, max_marks: int, ans_type: str, components: dict = None, min_length: str = None, grading_mode: str = 'experienced', question: str = '') -> dict:
         if not ocr_text or len(ocr_text.strip()) < 5:
@@ -116,8 +98,8 @@ Do not include markdown blocks or any other text outside the JSON.
                 length_penalty = 0.2
                 score = max(0, int(round((raw_percentage - length_penalty) * max_marks)))
         
-        # 3. Skip LLaMA Reasoning Generation (Will be batched later)
-        reasoning = f"Your answer scored {score}/{max_marks} based on semantic similarity to the rubric."
+        # 3. LLaMA Reasoning Generation (Sequential with Strict Timeout)
+        reasoning = self._generate_llama_reasoning(ideal_rubric, ocr_text, max_marks, score, grading_mode)
         
         # Build Trace
         trace = []
