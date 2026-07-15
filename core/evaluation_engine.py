@@ -64,7 +64,8 @@ Here are the questions, rubrics, student answers, and the Math Scores awarded:
 
 { 'The math engine was lenient, rewarding conceptual understanding.' if grading_mode == 'lenient' else 'The math engine was strict, deducting marks for missing core concepts.' }
 
-For EACH question, write a single, highly professional 2-sentence paragraph addressed directly to the student. Explain exactly why they received their specific math score based on what they got right and what was missing from the rubric. 
+For EACH question, write ONLY ONE SHORT SENTENCE addressed directly to the student explaining why they received their math score.
+CRITICAL LIMIT: Maximum 15 words per sentence. Be extremely concise to speed up generation!
 Never insult the student. Do not dispute the mathematical grade.
 
 You MUST return a STRICT JSON object mapping the Question Number (as a string) to your reasoning paragraph.
