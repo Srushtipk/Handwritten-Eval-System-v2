@@ -4,22 +4,8 @@ from sentence_transformers import SentenceTransformer, util
 
 class HandwrittenEvaluator:
     def __init__(self):
-        print("Initializing True Hybrid Engine: Semantic Math + Python Reasoning...")
+        print("Initializing True Hybrid Engine: Semantic Math + Semantic Reasoning...")
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        
-        # Stop words to ignore in keyword analysis
-        self._stop_words = {
-            'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-            'should', 'may', 'might', 'shall', 'can', 'need', 'dare', 'ought',
-            'used', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'about',
-            'as', 'it', 'its', 'this', 'that', 'these', 'those', 'and', 'or',
-            'but', 'not', 'from', 'into', 'through', 'during', 'before', 'after',
-            'also', 'which', 'who', 'what', 'how', 'when', 'where', 'if', 'so',
-            'then', 'than', 'each', 'any', 'all', 'both', 'few', 'more', 'most',
-            'other', 'such', 'no', 'nor', 'only', 'own', 'same', 'so', 'very',
-            'just', 'because', 'while', 'although', 'however', 'therefore', 'thus'
-        }
 
     def _evaluate_exact(self, student_answer: str, ideal_answer: str):
         ideal_words = set(re.findall(r'\w+', ideal_answer.lower()))
@@ -54,88 +40,56 @@ class HandwrittenEvaluator:
                 
         return raw_score
 
-    def _extract_key_concepts(self, text: str) -> list:
-        """Extract only meaningful technical single keywords from rubric text.
-        Strict rules: min 5 chars, not a stop word, not a number.
+    def _generate_semantic_reasoning(self, ideal_rubric: str, student_answer: str, max_marks: int, awarded_marks: int, grading_mode: str) -> str:
         """
-        words = re.findall(r'[a-zA-Z][a-zA-Z0-9_-]*', text.lower())
+        Splits the rubric into individual sentences and uses the already-loaded
+        SentenceTransformer to find which rubric points are semantically absent
+        from the student's answer. Quotes the actual missing rubric sentences directly.
+        Zero additional downloads. Instant. Contextually aware.
+        """
+        # Split rubric into individual meaningful sentences/points
+        rubric_sentences = [s.strip() for s in re.split(r'[.\n]|(?<=\d)\.', ideal_rubric) if len(s.strip()) > 15]
         
-        seen = set()
-        keywords = []
-        for w in words:
-            if (
-                w not in self._stop_words
-                and len(w) >= 5           # only meaningful-length words
-                and not w.isdigit()
-                and w not in seen
-            ):
-                seen.add(w)
-                keywords.append(w)
-        return keywords
-
-    def _generate_python_reasoning(self, ideal_rubric: str, student_answer: str, max_marks: int, awarded_marks: int, grading_mode: str) -> str:
-        """Generate accurate, specific feedback purely in Python by comparing rubric vs student answer."""
+        if not rubric_sentences:
+            percentage = (awarded_marks / max_marks * 100) if max_marks > 0 else 0
+            return f"You scored {awarded_marks}/{max_marks} ({percentage:.0f}%)."
         
-        rubric_lower = ideal_rubric.lower()
-        student_lower = student_answer.lower()
+        # Encode rubric sentences and the full student answer
+        rubric_embeddings = self.embedding_model.encode(rubric_sentences, convert_to_tensor=True)
+        student_embedding = self.embedding_model.encode(student_answer, convert_to_tensor=True)
         
-        # --- Step 1: Find key concepts in rubric that are MISSING from student answer ---
-        rubric_concepts = self._extract_key_concepts(ideal_rubric)
+        # Compute cosine similarity of student answer against each rubric sentence
+        similarities = util.cos_sim(student_embedding, rubric_embeddings)[0]
         
-        missing_concepts = []
-        covered_concepts = []
+        # Threshold: rubric points with similarity < 0.35 are considered "missing"
+        threshold = 0.35
+        missing_points = [
+            rubric_sentences[i]
+            for i in range(len(rubric_sentences))
+            if similarities[i].item() < threshold
+        ]
         
-        for concept in rubric_concepts:
-            if concept in student_lower:
-                covered_concepts.append(concept)
-            else:
-                missing_concepts.append(concept)
-        
-        # --- Step 2: Deduplicate — remove single words already covered by a longer missing phrase ---
-        # Keep only the most specific / unique missing terms, limit to top 5
-        final_missing = []
-        for c in missing_concepts:
-            # Skip if a longer phrase already captures this word
-            if not any(c in longer for longer in final_missing if longer != c):
-                final_missing.append(c)
-        
-        # Show at most 5 unique missing keywords
-        top_missing = final_missing[:5]
-        
-        # --- Step 3: Build the feedback message ---
+        # Build the feedback message
         percentage = (awarded_marks / max_marks * 100) if max_marks > 0 else 0
         
-        # Opening line based on score
         if awarded_marks == max_marks:
-            opening = f"Excellent work! You scored full marks ({awarded_marks}/{max_marks})."
+            prefix = f"Excellent work! You scored full marks ({awarded_marks}/{max_marks})."
+            return f"{prefix} All key points from the rubric were addressed."
         elif percentage >= 75:
-            opening = f"Good attempt. You scored {awarded_marks} out of {max_marks} marks."
+            prefix = f"Good attempt. You scored {awarded_marks} out of {max_marks} marks."
         elif percentage >= 50:
-            opening = f"Satisfactory. You scored {awarded_marks} out of {max_marks} marks, but there is room for improvement."
+            prefix = f"Satisfactory. You scored {awarded_marks} out of {max_marks} marks."
         elif percentage >= 25:
-            opening = f"You scored {awarded_marks} out of {max_marks} marks. Several key concepts need attention."
+            prefix = f"You scored {awarded_marks} out of {max_marks} marks."
         else:
-            opening = f"You scored {awarded_marks} out of {max_marks} marks. The answer requires significant improvement."
+            prefix = f"You scored {awarded_marks} out of {max_marks} marks. Significant improvement needed."
         
-        # What was covered — REMOVED: only show what is wrong
-        covered_line = ""
+        if not missing_points:
+            return f"{prefix} The answer covered most rubric points but lacked depth."
         
-        # What was missing
-        missing_line = ""
-        if top_missing:
-            missing_line = f" However, the following key points from the rubric were missing or insufficiently explained: {', '.join(top_missing)}."
-        elif awarded_marks == max_marks:
-            missing_line = " All key points from the rubric were addressed."
-        
-        # Mode-specific advice
-        if grading_mode == 'strict' and top_missing:
-            advice = " In strict mode, all rubric points must be explicitly addressed."
-        elif grading_mode == 'lenient' and top_missing:
-            advice = " A more detailed explanation of the missing points would improve your score further."
-        else:
-            advice = ""
-        
-        return f"{opening}{missing_line}{advice}"
+        # Format missing points as a clean bulleted list
+        missing_str = "; ".join(f'"{p}"' for p in missing_points[:4])
+        return f"{prefix} The following rubric points were not adequately addressed: {missing_str}."
 
     def evaluate(self, ideal_rubric: str, ocr_text: str, max_marks: int, ans_type: str, components: dict = None, min_length: str = None, grading_mode: str = 'experienced', question: str = '') -> dict:
         if not ocr_text or len(ocr_text.strip()) < 5:
@@ -157,8 +111,8 @@ class HandwrittenEvaluator:
                 length_penalty = 0.2
                 score = max(0, int(round((raw_percentage - length_penalty) * max_marks)))
         
-        # 3. Pure Python Reasoning (zero API calls, instant, accurate)
-        reasoning = self._generate_python_reasoning(ideal_rubric, ocr_text, max_marks, score, grading_mode)
+        # 3. Semantic Sentence-Gap Reasoning (uses existing model, instant, specific)
+        reasoning = self._generate_semantic_reasoning(ideal_rubric, ocr_text, max_marks, score, grading_mode)
         
         # Build Trace
         trace = []
