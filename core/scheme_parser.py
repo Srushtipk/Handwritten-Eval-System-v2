@@ -1,5 +1,12 @@
 import docx
 import re
+import os
+import json
+from dotenv import load_dotenv
+from google import genai
+
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
 class SchemeParser:
     def __init__(self):
@@ -126,8 +133,64 @@ class SchemeParser:
         if 'question' in current_question and 'answer' in current_question:
             questions.append(current_question)
             
+        # --- LLM FALLBACK FOR UNSTRUCTURED SCHEMES ---
+        if not questions and api_key:
+            print("Regex parser found 0 questions. Falling back to Gemini LLM parsing...")
+            questions = self._parse_with_gemini(doc)
+            
         return questions
 
+    def _parse_with_gemini(self, doc):
+        """Uses Gemini to intelligently extract questions and rubrics from complex unstructured university schemes."""
+        raw_text = "\n".join([p.text.strip() for p in doc.paragraphs if p.text.strip()])
+        
+        prompt = (
+            "You are an AI assistant parsing a university exam marking scheme/rubric.\n"
+            "Extract all the questions, their maximum marks, and the ideal answer/evaluation rubric.\n"
+            "Ignore syllabus tables, focus only on the actual questions and solutions.\n"
+            "Return the data strictly as a JSON array of objects. Do not include markdown formatting or ```json wrappers.\n\n"
+            "Format of each object:\n"
+            "{\n"
+            '  "id": "1a", (or "1", "2b", etc.)\n'
+            '  "question": "The question text...",\n'
+            '  "max_marks": 5,\n'
+            '  "type": "flexible", (always "flexible" unless it is strict math/code)\n'
+            '  "answer": "The detailed solution, rubric, or comparison matrix..."\n'
+            "}\n\n"
+            "--- RAW MARKING SCHEME TEXT ---\n"
+            f"{raw_text}"
+        )
+        
+        try:
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=prompt,
+                config={'temperature': 0.1}
+            )
+            
+            # Clean up potential markdown wrappers
+            res_text = response.text.strip()
+            if res_text.startswith("```json"):
+                res_text = res_text[7:]
+            if res_text.startswith("```"):
+                res_text = res_text[3:]
+            if res_text.endswith("```"):
+                res_text = res_text[:-3]
+                
+            parsed = json.loads(res_text.strip())
+            
+            # Ensure proper typing
+            for q in parsed:
+                if 'max_marks' in q:
+                    try:
+                        q['max_marks'] = int(q['max_marks'])
+                    except:
+                        q['max_marks'] = 10
+            return parsed
+        except Exception as e:
+            print(f"Gemini scheme parsing failed: {e}")
+            return []
+
 if __name__ == "__main__":
-    # Test script will be run by passing a dummy docx
     pass
