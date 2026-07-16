@@ -174,10 +174,14 @@ def evaluate_exam():
             total_score += res['score']
             total_max += max_m
             
-        # Override total_max if provided via UI
+        # Override total_max if provided via UI and scale score proportionally
         if exam_max_override and str(exam_max_override).strip():
             try:
-                total_max = int(str(exam_max_override).strip())
+                override_max = int(str(exam_max_override).strip())
+                if total_max > 0:
+                    # Scale score proportionally, e.g., if you got 14/15, and override is 10, new score is 9/10
+                    total_score = int(round((total_score / total_max) * override_max))
+                total_max = override_max
             except ValueError:
                 pass
             
