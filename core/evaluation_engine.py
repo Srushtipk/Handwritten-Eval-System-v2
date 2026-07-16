@@ -125,10 +125,8 @@ class HandwrittenEvaluator:
         else:
             opening = f"You scored {awarded_marks} out of {max_marks} marks. The answer requires significant improvement."
         
-        # What was covered
+        # What was covered — REMOVED: only show what is wrong
         covered_line = ""
-        if top_covered:
-            covered_line = f" Your answer correctly covered: {', '.join(top_covered[:3])}."
         
         # What was missing
         missing_line = ""
@@ -145,7 +143,7 @@ class HandwrittenEvaluator:
         else:
             advice = ""
         
-        return f"{opening}{covered_line}{missing_line}{advice}"
+        return f"{opening}{missing_line}{advice}"
 
     def evaluate(self, ideal_rubric: str, ocr_text: str, max_marks: int, ans_type: str, components: dict = None, min_length: str = None, grading_mode: str = 'experienced', question: str = '') -> dict:
         if not ocr_text or len(ocr_text.strip()) < 5:
