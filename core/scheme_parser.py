@@ -2,11 +2,6 @@ import docx
 import re
 import os
 import json
-from dotenv import load_dotenv
-from google import genai
-
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
 class SchemeParser:
     def __init__(self):
@@ -27,9 +22,19 @@ class SchemeParser:
         questions = []
         current_question = {}
         
-        # We will iterate through paragraphs and extract fields
-        # Using a simple state machine approach
+        # We will attempt two parsing strategies.
+        # Strategy 1: The standard format (Question: / Max Marks: / Answer:)
+        questions = self._parse_standard_format(doc)
         
+        # Strategy 2: The Academic format (Q1 a) ... / Marks Allotted: ... )
+        if not questions:
+            questions = self._parse_academic_format(doc)
+            
+        return questions
+
+    def _parse_standard_format(self, doc):
+        questions = []
+        current_question = {}
         current_key = None
         current_value = ""
         
@@ -40,45 +45,29 @@ class SchemeParser:
                 if current_key == 'question':
                     current_question['question'] = val
                 elif current_key == 'max_marks':
-                    # Extract numbers
                     nums = re.findall(r'\d+', val)
-                    if nums:
-                        current_question['max_marks'] = int(nums[0])
-                elif current_key == 'diagram_marks':
-                    nums = re.findall(r'\d+', val)
-                    if nums:
-                        current_question['diagram_marks'] = int(nums[0])
+                    if nums: current_question['max_marks'] = int(nums[0])
                 elif current_key == 'type':
                     current_question['type'] = val.lower()
-                elif current_key == 'min_length':
-                    current_question['min_length'] = val
                 elif current_key == 'answer':
                     current_question['answer'] = val
             
         for para in doc.paragraphs:
             text_block = para.text.strip()
-            if not text_block:
-                continue
+            if not text_block: continue
                 
-            # Handle soft-returns (Shift+Enter) within a single paragraph
             for text in text_block.split('\n'):
                 text = text.strip()
-                if not text:
-                    continue
+                if not text: continue
                     
-                # Check for headers using regex for flexible matching
                 q_match = re.match(r'^question(.*?):\s*(.*)', text, re.IGNORECASE)
                 if q_match:
                     save_field()
                     if 'question' in current_question and 'answer' in current_question:
                         questions.append(current_question)
                     current_question = {}
-                    
-                    q_id = q_match.group(1).strip()
-                    if not q_id:
-                        q_id = str(len(questions) + 1)
+                    q_id = q_match.group(1).strip() or str(len(questions) + 1)
                     current_question['id'] = q_id
-                    
                     current_key = 'question'
                     current_value = q_match.group(2).strip() + "\n"
                     
@@ -87,110 +76,76 @@ class SchemeParser:
                     current_key = 'max_marks'
                     current_value = text[len("max marks:"):].strip() + "\n"
                     
-                elif text.lower().startswith("component marks:"):
-                    save_field()
-                    comp_text = text[len("component marks:"):].strip()
-                    # Parse things like "Diagram (2), Syntax (3)" or "Diagram=2, Syntax=3"
-                    # Regex to find word followed by number inside parens or after equals/colon
-                    matches = re.findall(r'([A-Za-z\s]+)[=:\(\-]\s*(\d+)', comp_text)
-                    components = {}
-                    for name, marks in matches:
-                        components[name.strip()] = int(marks)
-                    current_question['components'] = components
-                    
-                    # Ensure backward compatibility if they use 'Diagram Marks: 2'
-                elif text.lower().startswith("diagram marks:"):
-                    save_field()
-                    d_marks = text.lower().replace("diagram marks:", "").strip()
-                    try:
-                        if 'components' not in current_question:
-                            current_question['components'] = {}
-                        current_question['components']['Diagram'] = int(d_marks)
-                    except:
-                        pass
-                    
                 elif text.lower().startswith("type:"):
                     save_field()
                     current_key = 'type'
                     current_value = text[len("type:"):].strip() + "\n"
-                    
-                elif text.lower().startswith("min length:"):
-                    save_field()
-                    current_key = 'min_length'
-                    current_value = text[len("min length:"):].strip() + "\n"
                     
                 elif text.lower().startswith("answer:"):
                     save_field()
                     current_key = 'answer'
                     current_value = text[len("answer:"):].strip() + "\n"
                 else:
-                    # Append to current value if it's a multi-line field
                     if current_key:
                         current_value += text + "\n"
-                    
-        # Save the last field and question
+                        
         save_field()
         if 'question' in current_question and 'answer' in current_question:
             questions.append(current_question)
             
-        # --- LLM FALLBACK FOR UNSTRUCTURED SCHEMES ---
-        if not questions and api_key:
-            print("Regex parser found 0 questions. Falling back to Gemini LLM parsing...")
-            questions = self._parse_with_gemini(doc)
-            
         return questions
 
-    def _parse_with_gemini(self, doc):
-        """Uses Gemini to intelligently extract questions and rubrics from complex unstructured university schemes."""
-        raw_text = "\n".join([p.text.strip() for p in doc.paragraphs if p.text.strip()])
+    def _parse_academic_format(self, doc):
+        """Parses academic rubrics like: Q1 a) <question> \\n Marks Allotted: 5 \\n <answer>"""
+        questions = []
+        current_question = None
         
-        prompt = (
-            "You are an AI assistant parsing a university exam marking scheme/rubric.\n"
-            "Extract all the questions, their maximum marks, and the ideal answer/evaluation rubric.\n"
-            "Ignore syllabus tables, focus only on the actual questions and solutions.\n"
-            "Return the data strictly as a JSON array of objects. Do not include markdown formatting or ```json wrappers.\n\n"
-            "Format of each object:\n"
-            "{\n"
-            '  "id": "1a", (or "1", "2b", etc.)\n'
-            '  "question": "The question text...",\n'
-            '  "max_marks": 5,\n'
-            '  "type": "flexible", (always "flexible" unless it is strict math/code)\n'
-            '  "answer": "The detailed solution, rubric, or comparison matrix..."\n'
-            "}\n\n"
-            "--- RAW MARKING SCHEME TEXT ---\n"
-            f"{raw_text}"
-        )
+        # Regex to match 'Q1 a)' or '1 a)' or 'Q 2)' etc.
+        q_start_pattern = re.compile(r'^(?:Q\s*)?(\d+\s*[a-z]?\))\s*(.*)', re.IGNORECASE)
+        marks_pattern = re.compile(r'marks\s*allotted:\s*(\d+)', re.IGNORECASE)
         
-        try:
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model='gemini-3.5-flash',
-                contents=prompt,
-                config={'temperature': 0.1}
-            )
+        for para in doc.paragraphs:
+            text_block = para.text.strip()
+            if not text_block: continue
             
-            # Clean up potential markdown wrappers
-            res_text = response.text.strip()
-            if res_text.startswith("```json"):
-                res_text = res_text[7:]
-            if res_text.startswith("```"):
-                res_text = res_text[3:]
-            if res_text.endswith("```"):
-                res_text = res_text[:-3]
+            for text in text_block.split('\n'):
+                text = text.strip()
+                if not text: continue
                 
-            parsed = json.loads(res_text.strip())
+                # Check if this line starts a new question
+                q_match = q_start_pattern.match(text)
+                if q_match and len(text) > 10:  # Avoid matching short labels
+                    # Save the previous question if valid
+                    if current_question and 'answer' in current_question and current_question['answer'].strip():
+                        questions.append(current_question)
+                        
+                    q_id = q_match.group(1).strip()
+                    q_text = q_match.group(2).strip()
+                    current_question = {
+                        'id': q_id,
+                        'question': q_text,
+                        'max_marks': 10,  # Default
+                        'type': 'flexible',
+                        'answer': ''
+                    }
+                    continue
+                
+                if current_question:
+                    # Look for marks
+                    m_match = marks_pattern.search(text)
+                    if m_match:
+                        current_question['max_marks'] = int(m_match.group(1))
+                        # Don't add the marks metadata line to the answer
+                        continue 
+                        
+                    # Everything else gets added to the answer/rubric body
+                    current_question['answer'] += text + "\n"
+                    
+        # Save the last question
+        if current_question and 'answer' in current_question and current_question['answer'].strip():
+            questions.append(current_question)
             
-            # Ensure proper typing
-            for q in parsed:
-                if 'max_marks' in q:
-                    try:
-                        q['max_marks'] = int(q['max_marks'])
-                    except:
-                        q['max_marks'] = 10
-            return parsed
-        except Exception as e:
-            print(f"Gemini scheme parsing failed: {e}")
-            return []
+        return questions
 
 if __name__ == "__main__":
     pass
