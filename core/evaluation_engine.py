@@ -63,11 +63,32 @@ class HandwrittenEvaluator:
         
         # Threshold: rubric points with similarity < 0.35 are considered "missing"
         threshold = 0.35
-        missing_points = [
+        raw_missing = [
             rubric_sentences[i]
             for i in range(len(rubric_sentences))
             if similarities[i].item() < threshold
         ]
+        
+        # Clean each missing point: strip leading stop words / filler so output is technical
+        _stop_starts = {
+            'a', 'an', 'the', 'it', 'its', 'this', 'that', 'these', 'those',
+            'there', 'they', 'he', 'she', 'we', 'you', 'i', 'in', 'is', 'are',
+            'was', 'were', 'also', 'each', 'every', 'some', 'any', 'both',
+            'such', 'then', 'when', 'where', 'which', 'who', 'how', 'if'
+        }
+        
+        def clean_point(sentence):
+            words = sentence.split()
+            # Drop leading stop/filler words
+            while words and words[0].lower().rstrip(',:') in _stop_starts:
+                words = words[1:]
+            # Capitalise first word and return
+            if not words:
+                return sentence.strip()
+            words[0] = words[0].capitalize()
+            return ' '.join(words)
+        
+        missing_points = [clean_point(p) for p in raw_missing if clean_point(p)]
         
         # Build the feedback message
         percentage = (awarded_marks / max_marks * 100) if max_marks > 0 else 0
@@ -87,9 +108,9 @@ class HandwrittenEvaluator:
         if not missing_points:
             return f"{prefix} The answer covered most rubric points but lacked depth."
         
-        # Format missing points as a clean bulleted list
-        missing_str = "; ".join(f'"{p}"' for p in missing_points[:4])
-        return f"{prefix} The following rubric points were not adequately addressed: {missing_str}."
+        # Format as a clean numbered list of technical phrases
+        items = "; ".join(missing_points[:4])
+        return f"{prefix} The following rubric points were not adequately addressed: {items}."
 
     def evaluate(self, ideal_rubric: str, ocr_text: str, max_marks: int, ans_type: str, components: dict = None, min_length: str = None, grading_mode: str = 'experienced', question: str = '') -> dict:
         if not ocr_text or len(ocr_text.strip()) < 5:
