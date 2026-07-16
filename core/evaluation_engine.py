@@ -55,30 +55,23 @@ class HandwrittenEvaluator:
         return raw_score
 
     def _extract_key_concepts(self, text: str) -> list:
-        """Extract meaningful multi-word and single-word key concepts from rubric text."""
-        text_lower = text.lower()
+        """Extract only meaningful technical single keywords from rubric text.
+        Strict rules: min 5 chars, not a stop word, not a number.
+        """
+        words = re.findall(r'[a-zA-Z][a-zA-Z0-9_-]*', text.lower())
         
-        # Extract multi-word technical phrases (2-3 words not in stopwords)
-        phrases = []
-        words = re.findall(r'[a-zA-Z][a-zA-Z0-9_-]*', text_lower)
-        # Build bigrams and trigrams
-        for i in range(len(words)):
-            w = words[i]
-            if w not in self._stop_words and len(w) > 3:
-                phrases.append(w)
-            if i < len(words) - 1:
-                w2 = words[i+1]
-                if w not in self._stop_words and w2 not in self._stop_words and len(w) > 2 and len(w2) > 2:
-                    phrases.append(f"{w} {w2}")
-        
-        # Deduplicate while preserving order
         seen = set()
-        unique = []
-        for p in phrases:
-            if p not in seen:
-                seen.add(p)
-                unique.append(p)
-        return unique
+        keywords = []
+        for w in words:
+            if (
+                w not in self._stop_words
+                and len(w) >= 5           # only meaningful-length words
+                and not w.isdigit()
+                and w not in seen
+            ):
+                seen.add(w)
+                keywords.append(w)
+        return keywords
 
     def _generate_python_reasoning(self, ideal_rubric: str, student_answer: str, max_marks: int, awarded_marks: int, grading_mode: str) -> str:
         """Generate accurate, specific feedback purely in Python by comparing rubric vs student answer."""
@@ -98,17 +91,16 @@ class HandwrittenEvaluator:
             else:
                 missing_concepts.append(concept)
         
-        # --- Step 2: Deduplicate missing concepts (remove if a longer phrase already captures it) ---
-        # e.g., if 'git push' is missing, don't also report 'push' separately
+        # --- Step 2: Deduplicate — remove single words already covered by a longer missing phrase ---
+        # Keep only the most specific / unique missing terms, limit to top 5
         final_missing = []
         for c in missing_concepts:
-            # Only keep it if no longer phrase containing this word was already added
+            # Skip if a longer phrase already captures this word
             if not any(c in longer for longer in final_missing if longer != c):
                 final_missing.append(c)
         
-        # Limit to top 4 most impactful missing concepts
-        top_missing = final_missing[:4]
-        top_covered = covered_concepts[:3]
+        # Show at most 5 unique missing keywords
+        top_missing = final_missing[:5]
         
         # --- Step 3: Build the feedback message ---
         percentage = (awarded_marks / max_marks * 100) if max_marks > 0 else 0
