@@ -6,6 +6,9 @@ class HandwrittenEvaluator:
     def __init__(self):
         print("Initializing True Hybrid Engine: Semantic Math + Semantic Reasoning...")
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        # Caches to prevent re-computing embeddings for the same rubric text
+        self.ideal_embedding_cache = {}
+        self.rubric_sentences_cache = {}
 
     def _evaluate_exact(self, student_answer: str, ideal_answer: str):
         ideal_words = set(re.findall(r'\w+', ideal_answer.lower()))
@@ -17,7 +20,12 @@ class HandwrittenEvaluator:
         
     def _evaluate_flexible(self, student_answer: str, ideal_answer: str):
         if not student_answer.strip(): return 0.0
-        emb_ideal = self.embedding_model.encode(ideal_answer, convert_to_tensor=True)
+        
+        # Use cache for ideal_answer embedding
+        if ideal_answer not in self.ideal_embedding_cache:
+            self.ideal_embedding_cache[ideal_answer] = self.embedding_model.encode(ideal_answer, convert_to_tensor=True)
+        emb_ideal = self.ideal_embedding_cache[ideal_answer]
+        
         emb_student = self.embedding_model.encode(student_answer, convert_to_tensor=True)
         cosine_scores = util.cos_sim(emb_ideal, emb_student)
         raw_score = cosine_scores[0][0].item()
@@ -54,8 +62,11 @@ class HandwrittenEvaluator:
             percentage = (awarded_marks / max_marks * 100) if max_marks > 0 else 0
             return f"You scored {awarded_marks}/{max_marks} ({percentage:.0f}%)."
         
-        # Encode rubric sentences and the full student answer
-        rubric_embeddings = self.embedding_model.encode(rubric_sentences, convert_to_tensor=True)
+        # Encode rubric sentences and the full student answer (use cache for rubric)
+        if ideal_rubric not in self.rubric_sentences_cache:
+            self.rubric_sentences_cache[ideal_rubric] = self.embedding_model.encode(rubric_sentences, convert_to_tensor=True)
+        rubric_embeddings = self.rubric_sentences_cache[ideal_rubric]
+        
         student_embedding = self.embedding_model.encode(student_answer, convert_to_tensor=True)
         
         # Compute cosine similarity of student answer against each rubric sentence

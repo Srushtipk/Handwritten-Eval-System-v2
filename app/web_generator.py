@@ -167,12 +167,17 @@ def evaluate_exam():
                 'extracted_answer': html.escape(student_ans)
             }, max_m
             
-        # Process sequentially
-        for i, q in enumerate(questions):
-            idx, res, max_m = evaluate_question((i, q))
-            results[idx] = res
-            total_score += res['score']
-            total_max += max_m
+        # Process using ThreadPoolExecutor for massive speedup
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(questions))) as executor:
+            # Submit all questions for evaluation
+            futures = [executor.submit(evaluate_question, (i, q)) for i, q in enumerate(questions)]
+            
+            # Wait for them to complete and aggregate
+            for future in concurrent.futures.as_completed(futures):
+                idx, res, max_m = future.result()
+                results[idx] = res
+                total_score += res['score']
+                total_max += max_m
             
         # Override total_max if provided via UI and scale score proportionally
         if exam_max_override and str(exam_max_override).strip():
