@@ -308,12 +308,24 @@
         }
 
         function showCompactView() {
-            setupPanel.classList.remove('hidden');
-            reportPanel.classList.remove('lg:col-span-12');
-            reportPanel.classList.add('lg:col-span-8');
-            btnBackToSetup.classList.add('hidden');
-            btnViewDetails.classList.remove('hidden');
-            document.querySelectorAll('.details-section').forEach(el => el.classList.add('hidden'));
+            if (currentMode === 'batch') {
+                // If in batch mode, we go back to the Gradebook table listing
+                document.getElementById('reportContent').classList.add('hidden');
+                document.getElementById('batchReportContent').classList.remove('hidden');
+                
+                setupPanel.classList.remove('hidden');
+                reportPanel.classList.remove('lg:col-span-12');
+                reportPanel.classList.add('lg:col-span-8');
+                btnBackToSetup.classList.add('hidden');
+                btnViewDetails.classList.add('hidden');
+            } else {
+                setupPanel.classList.remove('hidden');
+                reportPanel.classList.remove('lg:col-span-12');
+                reportPanel.classList.add('lg:col-span-8');
+                btnBackToSetup.classList.add('hidden');
+                btnViewDetails.classList.remove('hidden');
+                document.querySelectorAll('.details-section').forEach(el => el.classList.add('hidden'));
+            }
         }
 
         btnBackToSetup.addEventListener('click', showCompactView);
