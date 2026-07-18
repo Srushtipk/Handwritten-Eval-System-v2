@@ -204,5 +204,6 @@ def evaluate_exam():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Start web server on port 5000
-    app.run(debug=True, port=5000)
+    # Start web server on port 5000. 
+    # debug=False prevents the server from violently restarting mid-request when files change.
+    app.run(debug=False, port=5000)
