@@ -34,17 +34,32 @@ class HandwrittenEvaluator:
         cosine_scores = util.cos_sim(emb_ideal, emb_student)
         raw_score = cosine_scores[0][0].item()
         
-        # Human-like Strictness Normalization Mapping:
-        # SentenceTransformer cosine similarity naturally floats high even for weak matches.
-        # - Cosine score < 0.60: Irrelevant/extremely weak (0 marks)
-        # - Cosine score >= 0.90: Excellent match (1.0 full marks)
+        # Median Strictness Normalization Mapping:
+        # Balanced between too lenient and too strict.
+        # - Cosine score < 0.50: Irrelevant/extremely weak (0 marks)
+        # - Cosine score >= 0.82: Excellent match (1.0 full marks)
         # - Linear scaling in between.
-        if raw_score < 0.60:
+        if raw_score < 0.50:
             normalized_score = 0.0
-        elif raw_score >= 0.90:
+        elif raw_score >= 0.82:
             normalized_score = 1.0
         else:
-            normalized_score = (raw_score - 0.60) / (0.90 - 0.60)
+            normalized_score = (raw_score - 0.50) / (0.82 - 0.50)
+            
+        # Length-based Completeness Factor:
+        # If a student answer is extremely short, it cannot be a complete answer
+        # even if it has high semantic similarity to a key sentence.
+        student_words = re.findall(r'\b\w+\b', student_answer.lower())
+        ideal_words = re.findall(r'\b\w+\b', ideal_answer.lower())
+        
+        if len(ideal_words) > 10:
+            # We expect the student's answer to have at least 65% of the ideal answer's word count.
+            target_length = max(8, int(len(ideal_words) * 0.65))
+            length_ratio = len(student_words) / target_length
+            completeness_factor = min(1.0, length_ratio)
+            # Smooth the factor so it doesn't penalize slightly concise answers too heavily (0.2 baseline)
+            completeness_factor = 0.2 + 0.8 * completeness_factor
+            normalized_score = normalized_score * completeness_factor
             
         return normalized_score
 
