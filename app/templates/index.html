@@ -269,6 +269,9 @@
         </div>
     </div>
 
+    <!-- Hidden Offscreen Container for Direct PDF Exporting -->
+    <div id="hiddenPrintContainer" class="hidden"></div>
+
     <!-- Scripts (Functionality Preserved) -->
     <script>
         const fileScheme = document.getElementById('fileScheme');
@@ -298,6 +301,8 @@
         const themeToggleLightIcon = document.getElementById('themeToggleLightIcon');
 
         // Navigation Logic
+        let viewState = 'gradebook'; // 'setup', 'gradebook', 'report'
+
         function showDetailedView() {
             setupPanel.classList.add('hidden');
             reportPanel.classList.remove('lg:col-span-8');
@@ -309,16 +314,26 @@
 
         function showCompactView() {
             if (currentMode === 'batch') {
-                // If in batch mode, we go back to the Gradebook table listing
-                document.getElementById('reportContent').classList.add('hidden');
-                document.getElementById('batchReportContent').classList.remove('hidden');
-                
-                setupPanel.classList.remove('hidden');
-                reportPanel.classList.remove('lg:col-span-12');
-                reportPanel.classList.add('lg:col-span-8');
-                btnBackToSetup.classList.add('hidden');
+                if (viewState === 'report') {
+                    // Go back to the Gradebook table view (keep it full screen for clarity)
+                    viewState = 'gradebook';
+                    document.getElementById('reportContent').classList.add('hidden');
+                    document.getElementById('batchReportContent').classList.remove('hidden');
+                    btnBackToSetup.classList.remove('hidden'); // Remains to let them go back to setup
+                } else {
+                    // Go back to Setup from Gradebook
+                    viewState = 'setup';
+                    document.getElementById('batchReportContent').classList.add('hidden');
+                    document.getElementById('emptyResults').classList.remove('hidden');
+                    
+                    setupPanel.classList.remove('hidden');
+                    reportPanel.classList.remove('lg:col-span-12');
+                    reportPanel.classList.add('lg:col-span-8');
+                    btnBackToSetup.classList.add('hidden');
+                }
                 btnViewDetails.classList.add('hidden');
             } else {
+                viewState = 'setup';
                 setupPanel.classList.remove('hidden');
                 reportPanel.classList.remove('lg:col-span-12');
                 reportPanel.classList.add('lg:col-span-8');
@@ -505,7 +520,95 @@
 
         let batchResults = {}; // Map USN -> results payload
         
+        // Dynamic HTML Generator helper
+        function generateReportHTML(usn, data) {
+            let questionsHtml = '';
+            data.results.forEach(res => {
+                let penaltyHtml = '';
+                if(res.penalty > 0) {
+                    penaltyHtml = '<span class="text-[10px] font-bold text-red-600 dark:text-red-400 ml-3 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase">Penalty</span>';
+                }
+                
+                let traceHtml = '';
+                if (res.trace && res.trace.length > 0) {
+                    traceHtml = res.trace.map(t => {
+                        let icon = t.status === 'success' ? '<span class="text-blue-500 dark:text-orange-500 mr-2">✓</span>' : (t.status === 'warning' ? '<span class="text-amber-500 mr-2">!</span>' : '<span class="text-red-500 mr-2">✗</span>');
+                        return '<div class="flex items-start mb-2">' + icon + '<span class="text-slate-600 dark:text-slate-300 font-medium">' + t.msg + '</span></div>';
+                    }).join('');
+                } else {
+                    traceHtml = '<div class="text-slate-500 dark:text-slate-400 font-medium">' + res.reasoning + '</div>';
+                }
+                
+                let answerText = res.extracted_answer ? res.extracted_answer : 'No answer provided';
+                
+                questionsHtml += '<div class="bg-white dark:bg-[#121B3A] border-y border-r border-slate-100 dark:border-y-[#1E2954] dark:border-r-[#1E2954] border-l-4 border-l-blue-500 dark:border-l-orange-500 rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-lg dark:shadow-black/50 hover:shadow-xl hover:shadow-blue-500/10 hover:dark:shadow-orange-500/20 transition-shadow duration-300 mb-6">' +
+                    '<div class="p-6 border-b border-slate-100 dark:border-[#1E2954] bg-slate-50/50 dark:bg-[#0B0B2A]/50 flex flex-col md:flex-row justify-between items-start gap-4">' +
+                        '<div class="flex-1">' +
+                            '<div class="flex items-center mb-2">' +
+                                '<span class="w-8 h-8 rounded-full bg-blue-100 dark:bg-orange-500/20 text-blue-600 dark:text-orange-500 flex items-center justify-center text-xs font-bold mr-3">Q' + res.q_num + '</span>' +
+                                penaltyHtml +
+                            '</div>' +
+                            '<h4 class="text-base font-semibold text-slate-800 dark:text-white leading-snug">' + res.question + '</h4>' +
+                        '</div>' +
+                        '<div class="text-left md:text-right shrink-0 mt-2 md:mt-0">' +
+                            '<div class="text-3xl font-black text-slate-900 dark:text-white">' + res.score + '<span class="text-sm font-semibold text-slate-400 dark:text-slate-500 ml-1">/ ' + res.max_marks + '</span></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="details-section p-6 space-y-6">' +
+                        '<div>' +
+                            '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Student Transcript</h5>' +
+                            '<div class="bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl text-sm text-slate-700 dark:text-slate-300 font-medium italic leading-relaxed tracking-wide shadow-inner border border-slate-200/60 dark:border-none">' +
+                                '"' + answerText + '"' +
+                            '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 012-2h2a2 2 0 012 2"></path></svg>Evaluation Trace (Review)</h5>' +
+                            '<div class="text-sm bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl shadow-inner border border-slate-200/60 dark:border-none">' +
+                                traceHtml +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            });
+
+            return '<div class="bg-blue-50 dark:bg-[#0B0B2A] rounded-2xl p-8 mb-8 flex flex-col md:flex-row items-center justify-between border-l-4 border-blue-600 dark:border-orange-500">' +
+                '<div>' +
+                    '<h3 class="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2">Student ID: <span class="text-slate-800 dark:text-white ml-1">' + usn + '</span></h3>' +
+                    '<p class="text-xs uppercase tracking-widest font-bold text-blue-600 dark:text-orange-500 mb-1">Final Graded Score</p>' +
+                    '<div class="flex items-baseline">' +
+                        '<h3 class="text-5xl font-black text-slate-900 dark:text-white tracking-tight">' + data.total_score + '</h3>' +
+                        '<span class="text-xl text-slate-500 dark:text-slate-400 font-medium ml-2">/ ' + data.total_max + '</span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="space-y-6">' + questionsHtml + '</div>';
+        }
+
+        window.downloadStudentPDF = function(usn) {
+            const student = batchResults[usn];
+            if (!student) return;
+            
+            const printContainer = document.getElementById('hiddenPrintContainer');
+            printContainer.innerHTML = generateReportHTML(usn, student.data);
+            printContainer.classList.remove('hidden');
+            
+            const opt = {
+                margin:       0.5,
+                filename:     usn + '_Grade_Report.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+            
+            html2pdf().set(opt).from(printContainer).save().then(() => {
+                printContainer.innerHTML = '';
+                printContainer.classList.add('hidden');
+            });
+        };
+        
         function renderDetailedReport(usn, data, ocrText) {
+            viewState = 'report';
             rawOcrText.innerText = ocrText;
             displayUSN.classList.remove('hidden');
             displayUSN.querySelector('span').innerText = usn;
@@ -652,7 +755,6 @@
                     btnRun.innerHTML = '<span>Evaluate Now</span><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
                     btnRun.classList.remove('opacity-70', 'cursor-not-allowed');
                 }
-            } else {
                 // Batch Mode!
                 const pdfFiles = Array.from(fileFolderInput.files).filter(f => f.name.endsWith('.pdf'));
                 if (pdfFiles.length === 0) {
@@ -665,6 +767,10 @@
                 emptyResults.classList.add('hidden');
                 reportContent.classList.add('hidden');
                 batchReportContent.classList.remove('hidden');
+                
+                // Transition UI to full width Gradebook dashboard immediately for a spacious classroom overview
+                viewState = 'gradebook';
+                showDetailedView();
                 
                 const batchGradebookList = document.getElementById('batchGradebookList');
                 batchGradebookList.innerHTML = '';
@@ -727,8 +833,9 @@
                         row.innerHTML = `<td class="px-6 py-4 font-bold text-slate-800 dark:text-white">${usn}</td>` +
                             `<td class="px-6 py-4 text-slate-900 dark:text-slate-300 font-extrabold">${data.total_score} / ${data.total_max}</td>` +
                             `<td class="px-6 py-4"><span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase tracking-wider">Graded</span></td>` +
-                            `<td class="px-6 py-4 text-right">` +
-                                `<button onclick="viewStudentDetails('${usn}')" class="px-4 py-2 bg-blue-100 hover:bg-blue-200 dark:bg-[#1E2954] text-blue-600 dark:text-orange-400 text-xs font-bold rounded-lg transition">View Report</button>` +
+                            `<td class="px-6 py-4 text-right space-x-2">` +
+                                `<button onclick="viewStudentDetails('${usn}')" class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-[#1E2954] text-blue-600 dark:text-orange-400 text-xs font-bold rounded-lg transition">🔍 View</button>` +
+                                `<button onclick="downloadStudentPDF('${usn}')" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold rounded-lg transition">📥 Export PDF</button>` +
                             `</td>`;
                             
                     } catch(err) {
