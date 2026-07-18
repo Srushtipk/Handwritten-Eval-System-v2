@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.ocr_engine import process_pdf, segment_answers_with_gemini
 from core.evaluation_engine import HandwrittenEvaluator
 from core.scheme_parser import SchemeParser
-from scripts.convert_rubric import convert_scheme
+import docx
 
 app = Flask(__name__)
 
@@ -96,19 +96,40 @@ def standardize():
     clean_path = os.path.join(UPLOAD_FOLDER, clean_filename)
     
     try:
-        # Check if convert_scheme actually succeeded
-        # If it finds 0 questions, we can let the user know
-        from core.scheme_parser import SchemeParser
-        # Our convert_scheme script saves to output_path and prints to console.
-        convert_scheme(raw_path, clean_path)
-        
-        if not os.path.exists(clean_path):
-            return jsonify({'error': 'Failed to standardize scheme. Please ensure it has Q1 a) style labels.'}), 400
-            
+        # Use our ultra-robust SchemeParser (which has the Gemini fallback)
         parser = SchemeParser()
-        questions = parser.parse_scheme(clean_path)
+        questions = parser.parse_scheme(raw_path)
+        
         if not questions:
-            return jsonify({'error': 'Standardization succeeded but 0 questions were detected.'}), 400
+            return jsonify({'error': 'Standardization failed. The AI could not extract any questions from the document.'}), 400
+            
+        # Generate the standardized DOCX
+        doc_out = docx.Document()
+        doc_out.add_heading('Standardized Marking Scheme', 0)
+        
+        for q in questions:
+            p_q = doc_out.add_paragraph()
+            p_q.add_run(f"Question {q['id']}: ").bold = True
+            p_q.add_run(q['question'])
+            
+            p_m = doc_out.add_paragraph()
+            p_m.add_run("Max Marks: ").bold = True
+            p_m.add_run(str(q['max_marks']))
+            
+            p_t = doc_out.add_paragraph()
+            p_t.add_run("Type: ").bold = True
+            p_t.add_run(q.get('type', 'flexible'))
+            
+            p_a = doc_out.add_paragraph()
+            p_a.add_run("Answer: ").bold = True
+            
+            answer_text = q['answer'].strip()
+            if answer_text:
+                doc_out.add_paragraph(answer_text)
+                
+            doc_out.add_paragraph("-" * 40)
+            
+        doc_out.save(clean_path)
             
         # Return the clean file back to the client
         return send_file(
