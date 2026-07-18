@@ -294,6 +294,11 @@
         const reportPanel = document.getElementById('reportPanel');
         const btnBackToSetup = document.getElementById('btnBackToSetup');
         const btnViewDetails = document.getElementById('btnViewDetails');
+        const batchReportContent = document.getElementById('batchReportContent');
+        const dropZoneFolder = document.getElementById('dropZoneFolder');
+        const folderLabel = document.getElementById('folderLabel');
+        const usnContainer = document.getElementById('usnContainer');
+        const dropZonePdf = document.getElementById('dropZonePdf');
 
         // Theme Toggle Logic
         const themeToggleBtn = document.getElementById('themeToggle');
@@ -433,7 +438,7 @@
 
         const fileFolderInput = document.getElementById('fileFolder');
         fileFolderInput.addEventListener('change', (e) => {
-            const pdfFiles = Array.from(e.target.files).filter(f => f.name.endsWith('.pdf'));
+            const pdfFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
             if(pdfFiles.length > 0) {
                 folderLabel.innerText = pdfFiles.length + ' PDF(s) Selected';
             } else {
@@ -755,8 +760,9 @@
                     btnRun.innerHTML = '<span>Evaluate Now</span><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
                     btnRun.classList.remove('opacity-70', 'cursor-not-allowed');
                 }
+            } else {
                 // Batch Mode!
-                const pdfFiles = Array.from(fileFolderInput.files).filter(f => f.name.endsWith('.pdf'));
+                const pdfFiles = Array.from(fileFolderInput.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
                 if (pdfFiles.length === 0) {
                     alert("Please select a folder containing student PDF answer sheets.");
                     return;
