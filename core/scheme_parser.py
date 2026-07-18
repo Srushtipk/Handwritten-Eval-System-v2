@@ -2,6 +2,11 @@ import docx
 import re
 import os
 import json
+from dotenv import load_dotenv
+from google import genai
+
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
 class SchemeParser:
     def __init__(self):
@@ -30,7 +35,52 @@ class SchemeParser:
         if not questions:
             questions = self._parse_academic_format(doc)
             
+        # Strategy 3: The Gemini LLM Fallback (for messy unstructured rubrics)
+        if not questions and api_key:
+            questions = self._parse_with_gemini(doc)
+            
         return questions
+        
+    def _parse_with_gemini(self, doc):
+        """Uses Gemini to intelligently extract questions and answers from a messy DOCX."""
+        print("Regex parsers failed. Engaging Gemini LLM fallback for scheme extraction...")
+        full_text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+        
+        prompt = (
+            "You are an expert exam evaluator parsing a university marking scheme/rubric.\n"
+            "Extract all questions, their maximum marks, and the ideal answer from the following text.\n"
+            "Return a raw JSON list of objects EXACTLY in this format:\n"
+            "[\n"
+            "  {\n"
+            '    "id": "1a",\n'
+            '    "question": "What is ...",\n'
+            '    "max_marks": 5,\n'
+            '    "type": "flexible",\n'
+            '    "answer": "The ideal answer text goes here..."\n'
+            "  }\n"
+            "]\n"
+            "Do NOT wrap the output in markdown or ```json. Just return the raw JSON array.\n\n"
+            f"--- MARKING SCHEME TEXT ---\n{full_text}"
+        )
+        
+        try:
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=prompt
+            )
+            
+            raw = response.text.strip()
+            if raw.startswith("```json"):
+                raw = raw[7:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+                
+            questions = json.loads(raw.strip())
+            return questions
+        except Exception as e:
+            print(f"Gemini fallback failed: {e}")
+            return []
 
     def _parse_standard_format(self, doc):
         questions = []
