@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.ocr_engine import process_pdf, segment_answers_with_gemini
 from core.evaluation_engine import HandwrittenEvaluator
 from core.scheme_parser import SchemeParser
+from core.database import DatabaseManager
 import docx
 
 app = Flask(__name__)
@@ -30,6 +31,9 @@ try:
 except Exception as e:
     print(f"Warning: Could not initialize local evaluator: {e}")
     evaluator = None
+
+# Initialize local SQLite DB for analytics
+db_manager = DatabaseManager(os.path.join(BASE_DIR, "data", "analytics.db"))
 
 scheme_parser = SchemeParser()
 
@@ -154,6 +158,9 @@ def evaluate_exam():
         grading_mode = data.get('grading_mode', 'experienced')
         exam_max_override = data.get('exam_max_marks')
         
+        student_id = data.get('student_id', 'Unknown Student')
+        exam_id = data.get('exam_id', 'Unknown Exam')
+        
         if not ocr_text or not questions:
             return jsonify({'error': 'Missing ocr_text or questions in payload'}), 400
             
@@ -254,6 +261,16 @@ def evaluate_exam():
                 total_max = override_max
             except ValueError:
                 pass
+                
+        # Save evaluation results to database
+        db_manager.save_evaluation(
+            exam_id=exam_id,
+            student_id=student_id,
+            total_score=total_score,
+            total_max=total_max,
+            grading_mode=grading_mode,
+            results=results
+        )
             
         return jsonify({
             'success': True,
@@ -263,6 +280,17 @@ def evaluate_exam():
             'results': results
         })
         
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics', methods=['GET'])
+def get_analytics():
+    exam_id = request.args.get('exam_id')
+    try:
+        summary = db_manager.get_analytics_summary(exam_id)
+        return jsonify(summary)
     except Exception as e:
         import traceback
         traceback.print_exc()
