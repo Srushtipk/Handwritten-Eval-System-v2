@@ -90,7 +90,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <!-- Left Panel -->
-            <div class="lg:col-span-4 flex flex-col space-y-6">
+            <div id="setupPanel" class="lg:col-span-4 flex flex-col space-y-6 transition-all duration-300">
                 
                 <div class="bg-white/80 backdrop-blur-xl dark:bg-[#121B3A]/90 dark:backdrop-blur-xl rounded-3xl p-8 shadow-xl shadow-blue-900/5 dark:shadow-2xl dark:shadow-black/60 border border-slate-100 dark:border-[#1E2954]">
                     <div class="flex items-center space-x-3 mb-8">
@@ -155,12 +155,23 @@
             </div>
 
             <!-- Right Panel -->
-            <div class="lg:col-span-8 bg-white/80 backdrop-blur-xl dark:bg-[#121B3A]/90 dark:backdrop-blur-xl rounded-3xl shadow-xl shadow-blue-900/5 dark:shadow-2xl dark:shadow-black/60 border border-slate-100 dark:border-[#1E2954] p-8 min-h-[600px] flex flex-col relative overflow-hidden">
+            <div id="reportPanel" class="lg:col-span-8 bg-white/80 backdrop-blur-xl dark:bg-[#121B3A]/90 dark:backdrop-blur-xl rounded-3xl shadow-xl shadow-blue-900/5 dark:shadow-2xl dark:shadow-black/60 border border-slate-100 dark:border-[#1E2954] p-8 min-h-[600px] flex flex-col relative overflow-hidden transition-all duration-300">
                 <div class="flex justify-between items-center mb-8 pb-4 border-b border-slate-100 dark:border-[#1E2954]">
-                    <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center">
-                        Report Dashboard
-                    </h2>
-                    <span id="statusBadge" class="px-4 py-1.5 rounded-full bg-slate-100 dark:bg-[#0B0B2A] text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Awaiting Input</span>
+                    <div class="flex items-center">
+                        <button id="btnBackToSetup" class="hidden mr-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-[#0B0B2A] dark:hover:bg-[#1E2954] flex items-center justify-center text-slate-600 dark:text-slate-400 transition-colors shadow-sm" title="Back to Setup (Compact View)">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        </button>
+                        <h2 class="text-xl font-bold text-slate-800 dark:text-white flex items-center">
+                            Report Dashboard
+                        </h2>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button id="btnViewDetails" class="hidden px-4 py-1.5 rounded-full bg-blue-100 hover:bg-blue-200 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-blue-700 dark:text-orange-400 text-xs font-bold uppercase tracking-wider transition-colors flex items-center shadow-sm">
+                            Detailed Report
+                            <svg class="w-4 h-4 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                        </button>
+                        <span id="statusBadge" class="px-4 py-1.5 rounded-full bg-slate-100 dark:bg-[#0B0B2A] text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Awaiting Input</span>
+                    </div>
                 </div>
 
                 <div id="emptyResults" class="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
@@ -237,11 +248,37 @@
         const totalMaxMarksElem = document.getElementById('totalMaxMarks');
         const rawOcrText = document.getElementById('rawOcrText');
         const questionsList = document.getElementById('questionsList');
+        const setupPanel = document.getElementById('setupPanel');
+        const reportPanel = document.getElementById('reportPanel');
+        const btnBackToSetup = document.getElementById('btnBackToSetup');
+        const btnViewDetails = document.getElementById('btnViewDetails');
 
         // Theme Toggle Logic
         const themeToggleBtn = document.getElementById('themeToggle');
         const themeToggleDarkIcon = document.getElementById('themeToggleDarkIcon');
         const themeToggleLightIcon = document.getElementById('themeToggleLightIcon');
+
+        // Navigation Logic
+        function showDetailedView() {
+            setupPanel.classList.add('hidden');
+            reportPanel.classList.remove('lg:col-span-8');
+            reportPanel.classList.add('lg:col-span-12');
+            btnBackToSetup.classList.remove('hidden');
+            btnViewDetails.classList.add('hidden');
+            document.querySelectorAll('.details-section').forEach(el => el.classList.remove('hidden'));
+        }
+
+        function showCompactView() {
+            setupPanel.classList.remove('hidden');
+            reportPanel.classList.remove('lg:col-span-12');
+            reportPanel.classList.add('lg:col-span-8');
+            btnBackToSetup.classList.add('hidden');
+            btnViewDetails.classList.remove('hidden');
+            document.querySelectorAll('.details-section').forEach(el => el.classList.add('hidden'));
+        }
+
+        btnBackToSetup.addEventListener('click', showCompactView);
+        btnViewDetails.addEventListener('click', showDetailedView);
 
         if (localStorage.getItem('color-theme') === 'light' || (!('color-theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.remove('dark');
@@ -468,7 +505,7 @@
                                 '<div class="text-3xl font-black text-slate-900 dark:text-white">' + res.score + '<span class="text-sm font-semibold text-slate-400 dark:text-slate-500 ml-1">/ ' + res.max_marks + '</span></div>' +
                             '</div>' +
                         '</div>' +
-                        '<div class="p-6 space-y-6">' +
+                        '<div class="details-section p-6 space-y-6">' +
                             '<div>' +
                                 '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Student Transcript</h5>' +
                                 '<div class="bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl text-sm text-slate-700 dark:text-slate-300 font-medium italic leading-relaxed tracking-wide shadow-inner border border-slate-200/60 dark:border-none">' +
@@ -485,6 +522,10 @@
                     '</div>';
                     questionsList.insertAdjacentHTML('beforeend', html);
                 });
+                
+                // Expand to full width by default when generated!
+                showDetailedView();
+                
             } catch(e) {
                 alert("Error: " + e.message);
                 setStatus('Failed', 'error');

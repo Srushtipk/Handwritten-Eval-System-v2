@@ -102,26 +102,15 @@ class HandwrittenEvaluator:
         missing_points = [clean_point(p) for p in raw_missing if clean_point(p)]
         
         # Build the feedback message
-        percentage = (awarded_marks / max_marks * 100) if max_marks > 0 else 0
-        
         if awarded_marks == max_marks:
-            prefix = f"Excellent work! You scored full marks ({awarded_marks}/{max_marks})."
-            return f"{prefix} All key points from the rubric were addressed."
-        elif percentage >= 75:
-            prefix = f"Good attempt. You scored {awarded_marks} out of {max_marks} marks."
-        elif percentage >= 50:
-            prefix = f"Satisfactory. You scored {awarded_marks} out of {max_marks} marks."
-        elif percentage >= 25:
-            prefix = f"You scored {awarded_marks} out of {max_marks} marks."
-        else:
-            prefix = f"You scored {awarded_marks} out of {max_marks} marks. Significant improvement needed."
+            return "All key points from the rubric were addressed."
         
         if not missing_points:
-            return f"{prefix} The answer covered most rubric points but lacked depth."
+            return "The answer covered most rubric points but lacked depth."
         
         # Format as a clean numbered list of technical phrases
         items = "; ".join(missing_points[:4])
-        return f"{prefix} The following rubric points were not adequately addressed: {items}."
+        return f"The following rubric points were not adequately addressed: {items}."
 
     def evaluate(self, ideal_rubric: str, ocr_text: str, max_marks: int, ans_type: str, components: dict = None, min_length: str = None, grading_mode: str = 'experienced', question: str = '') -> dict:
         if not ocr_text or len(ocr_text.strip()) < 5:
