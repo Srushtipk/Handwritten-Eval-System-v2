@@ -16,7 +16,11 @@ class HandwrittenEvaluator:
         if not ideal_words: return 1.0
         matches = ideal_words.intersection(student_words)
         score = len(matches) / len(ideal_words)
-        return min(1.0, score * 1.3)
+        
+        # Strict exact match scaling: below 30% match is 0.0 marks
+        if score < 0.30:
+            return 0.0
+        return min(1.0, (score - 0.30) / (0.70))
         
     def _evaluate_flexible(self, student_answer: str, ideal_answer: str):
         if not student_answer.strip(): return 0.0
@@ -29,7 +33,20 @@ class HandwrittenEvaluator:
         emb_student = self.embedding_model.encode(student_answer, convert_to_tensor=True)
         cosine_scores = util.cos_sim(emb_ideal, emb_student)
         raw_score = cosine_scores[0][0].item()
-        return min(1.0, raw_score * 1.2)
+        
+        # Human-like Strictness Normalization Mapping:
+        # SentenceTransformer cosine similarity naturally floats high even for weak matches.
+        # - Cosine score < 0.60: Irrelevant/extremely weak (0 marks)
+        # - Cosine score >= 0.90: Excellent match (1.0 full marks)
+        # - Linear scaling in between.
+        if raw_score < 0.60:
+            normalized_score = 0.0
+        elif raw_score >= 0.90:
+            normalized_score = 1.0
+        else:
+            normalized_score = (raw_score - 0.60) / (0.90 - 0.60)
+            
+        return normalized_score
 
     def _run_hybrid_text_eval(self, ideal_rubric, ocr_text, text_max_marks, ans_type, grading_mode='experienced'):
         if text_max_marks <= 0: return 0.0
