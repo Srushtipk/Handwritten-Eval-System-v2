@@ -101,14 +101,18 @@
                     </div>
 
                     <div id="dropZoneScheme" class="relative mb-5 border-2 border-dashed border-slate-200 dark:border-[#1E2954] rounded-2xl p-6 text-center hover:border-blue-500 dark:hover:border-orange-500 transition-colors bg-slate-50/50 dark:bg-[#0B0B2A]/50 group">
-                        <label for="fileScheme" class="cursor-pointer block w-full h-full">
+                        <label for="fileScheme" class="cursor-pointer block w-full h-full mb-3">
                             <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                 <svg class="w-6 h-6 text-blue-600 dark:text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             </div>
                             <span id="schemeLabel" class="text-slate-700 dark:text-slate-200 font-semibold text-sm block mb-1">Marking Scheme (DOCX)</span>
                             <span class="text-xs text-slate-400 dark:text-slate-500">Click to upload document</span>
                         </label>
-                        <input type="file" id="fileScheme" accept=".doc,.docx" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10">
+                        <input type="file" id="fileScheme" accept=".doc,.docx" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10" style="height: 70%;">
+                        <button id="btnStandardize" class="hidden relative z-20 w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex justify-center items-center mt-2 shadow-md hover:shadow-lg transition">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                            ✨ Standardize Scheme
+                        </button>
                     </div>
 
                     <div id="dropZonePdf" class="relative mb-6 border-2 border-dashed border-slate-200 dark:border-[#1E2954] rounded-2xl p-6 text-center hover:border-blue-500 dark:hover:border-orange-500 transition-colors bg-slate-50/50 dark:bg-[#0B0B2A]/50 group">
@@ -274,11 +278,51 @@
             html2pdf().set(opt).from(element).save();
         }
 
+        let fileSchemeInput = document.getElementById('fileScheme');
+        let btnStandardize = document.getElementById('btnStandardize');
+        let standardizedBlob = null; 
+
         // File Selection UI
-        fileScheme.addEventListener('change', (e) => {
-            if(e.target.files[0]) schemeLabel.innerText = e.target.files[0].name;
-            else schemeLabel.innerText = 'Marking Scheme (DOCX)';
+        fileSchemeInput.addEventListener('change', (e) => {
+            standardizedBlob = null; 
+            if(e.target.files[0]) {
+                schemeLabel.innerText = e.target.files[0].name;
+                btnStandardize.classList.remove('hidden');
+            } else {
+                schemeLabel.innerText = 'Marking Scheme (DOCX)';
+                btnStandardize.classList.add('hidden');
+            }
         });
+        
+        btnStandardize.addEventListener('click', async () => {
+            if (fileSchemeInput.files.length === 0) return;
+            
+            let formData = new FormData();
+            formData.append('scheme', fileSchemeInput.files[0]);
+            
+            const originalText = btnStandardize.innerHTML;
+            btnStandardize.innerHTML = '<span class="flex items-center"><svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Cleaning...</span>';
+            btnStandardize.disabled = true;
+
+            try {
+                let response = await fetch('/api/standardize', { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const errText = await response.json();
+                    throw new Error(errText.error || 'Failed to standardize scheme');
+                }
+                standardizedBlob = await response.blob();
+                const cleanName = 'std_' + fileSchemeInput.files[0].name;
+                schemeLabel.innerText = cleanName;
+                schemeLabel.classList.add('text-green-500');
+                btnStandardize.innerHTML = '<span class="flex items-center text-green-100">✔ Standardized Successfully!</span>';
+                setTimeout(() => { btnStandardize.classList.add('hidden'); }, 3000);
+            } catch (error) {
+                alert('Standardization Error: ' + error.message);
+                btnStandardize.innerHTML = originalText;
+                btnStandardize.disabled = false;
+            }
+        });
+
         filePdf.addEventListener('change', (e) => {
             if(e.target.files[0]) pdfName.innerText = e.target.files[0].name;
             else pdfName.innerText = 'Student Answer (PDF)';
@@ -306,6 +350,7 @@
             if(e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                 fileScheme.files = e.dataTransfer.files;
                 schemeLabel.innerText = e.dataTransfer.files[0].name;
+                btnStandardize.classList.remove('hidden');
             }
         });
         dropZonePdf.addEventListener('drop', (e) => {
@@ -330,7 +375,11 @@
             }
             
             const formData = new FormData();
-            formData.append('scheme', fileScheme.files[0]);
+            if (standardizedBlob) {
+                formData.append('scheme', standardizedBlob, schemeLabel.innerText);
+            } else {
+                formData.append('scheme', fileScheme.files[0]);
+            }
             formData.append('student_pdf', filePdf.files[0]);
             formData.append('grading_mode', gradingMode.value);
             if (examMaxMarks.value.trim() !== '') {

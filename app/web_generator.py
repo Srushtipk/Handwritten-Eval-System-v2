@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.ocr_engine import process_pdf, segment_answers_with_gemini
 from core.evaluation_engine import HandwrittenEvaluator
 from core.scheme_parser import SchemeParser
+from scripts.convert_rubric import convert_scheme
 
 app = Flask(__name__)
 
@@ -76,6 +77,49 @@ def extract_text():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/standardize', methods=['POST'])
+def standardize():
+    """Endpoint to clean up a messy professor's rubric into the standard format."""
+    if 'scheme' not in request.files:
+        return jsonify({'error': 'Missing scheme file'}), 400
+        
+    scheme_file = request.files['scheme']
+    if scheme_file.filename == '':
+        return jsonify({'error': 'No selected scheme file'}), 400
+        
+    filename = secure_filename(scheme_file.filename)
+    raw_path = os.path.join(UPLOAD_FOLDER, f"raw_{filename}")
+    scheme_file.save(raw_path)
+    
+    clean_filename = f"std_{filename}"
+    clean_path = os.path.join(UPLOAD_FOLDER, clean_filename)
+    
+    try:
+        # Check if convert_scheme actually succeeded
+        # If it finds 0 questions, we can let the user know
+        from core.scheme_parser import SchemeParser
+        # Our convert_scheme script saves to output_path and prints to console.
+        convert_scheme(raw_path, clean_path)
+        
+        if not os.path.exists(clean_path):
+            return jsonify({'error': 'Failed to standardize scheme. Please ensure it has Q1 a) style labels.'}), 400
+            
+        parser = SchemeParser()
+        questions = parser.parse_scheme(clean_path)
+        if not questions:
+            return jsonify({'error': 'Standardization succeeded but 0 questions were detected.'}), 400
+            
+        # Return the clean file back to the client
+        return send_file(
+            clean_path,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name=clean_filename
+        )
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': f'Internal server error during standardization: {str(e)}'}), 500
 
 @app.route('/api/evaluate', methods=['POST'])
 def evaluate_exam():
