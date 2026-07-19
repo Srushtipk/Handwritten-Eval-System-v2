@@ -37,10 +37,19 @@ class DatabaseManager:
                 score INTEGER NOT NULL,
                 max_marks INTEGER NOT NULL,
                 match_percentage REAL,
+                needs_review BOOLEAN DEFAULT 0,
+                is_overridden BOOLEAN DEFAULT 0,
                 FOREIGN KEY (evaluation_id) REFERENCES evaluations (id)
             )
         ''')
         
+        # Upgrade existing database if columns are missing
+        try:
+            cursor.execute("ALTER TABLE question_scores ADD COLUMN needs_review BOOLEAN DEFAULT 0")
+            cursor.execute("ALTER TABLE question_scores ADD COLUMN is_overridden BOOLEAN DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass # Columns already exist
+            
         conn.commit()
         conn.close()
 
@@ -64,20 +73,47 @@ class DatabaseManager:
         for res in results:
             if not res: continue
             cursor.execute('''
-                INSERT INTO question_scores (evaluation_id, q_num, question_text, score, max_marks, match_percentage)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO question_scores (evaluation_id, q_num, question_text, score, max_marks, match_percentage, needs_review)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 evaluation_id,
                 res.get('q_num', 0),
                 res.get('question', ''),
                 res.get('score', 0),
                 res.get('max_marks', 0),
-                res.get('match', 0.0)
+                res.get('match', 0.0),
+                1 if res.get('needs_review') else 0
             ))
             
         conn.commit()
         conn.close()
         return evaluation_id
+
+    def override_score(self, evaluation_id, q_num, new_score):
+        """Overrides the score for a specific question and recalculates the total evaluation score."""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        
+        # Update the question score and flags
+        cursor.execute('''
+            UPDATE question_scores 
+            SET score = ?, needs_review = 0, is_overridden = 1
+            WHERE evaluation_id = ? AND q_num = ?
+        ''', (new_score, evaluation_id, q_num))
+        
+        # Recalculate total score for this evaluation
+        cursor.execute('''
+            SELECT SUM(score) FROM question_scores WHERE evaluation_id = ?
+        ''', (evaluation_id,))
+        new_total = cursor.fetchone()[0] or 0
+        
+        cursor.execute('''
+            UPDATE evaluations SET total_score = ? WHERE id = ?
+        ''', (new_total, evaluation_id))
+        
+        conn.commit()
+        conn.close()
+        return new_total
 
     def get_analytics_summary(self, exam_id=None):
         """

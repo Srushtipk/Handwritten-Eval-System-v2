@@ -53,8 +53,10 @@ def extract_text():
     if scheme_file.filename == '' or student_file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
         
-    scheme_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(scheme_file.filename))
-    student_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(student_file.filename))
+    import uuid
+    uid = uuid.uuid4().hex[:8]
+    scheme_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uid}_{secure_filename(scheme_file.filename)}")
+    student_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uid}_{secure_filename(student_file.filename)}")
     
     scheme_file.save(scheme_path)
     student_file.save(student_path)
@@ -212,7 +214,8 @@ def evaluate_exam():
                     'reasoning': 'The student did not attempt this question.',
                     'match': 0,
                     'penalty': 0,
-                    'extracted_answer': 'Not Attempted'
+                    'extracted_answer': 'Not Attempted',
+                    'needs_review': False
                 }, max_m
             
             eval_result = evaluator.evaluate(
@@ -236,7 +239,8 @@ def evaluate_exam():
                 'trace': eval_result.get('trace', []),
                 'match': eval_result['match_percentage'],
                 'penalty': eval_result['penalty'],
-                'extracted_answer': html.escape(student_ans)
+                'extracted_answer': html.escape(student_ans),
+                'needs_review': eval_result['match_percentage'] < 0.35
             }, max_m
             
         # Process using ThreadPoolExecutor for massive speedup
@@ -263,7 +267,7 @@ def evaluate_exam():
                 pass
                 
         # Save evaluation results to database
-        db_manager.save_evaluation(
+        evaluation_id = db_manager.save_evaluation(
             exam_id=exam_id,
             student_id=student_id,
             total_score=total_score,
@@ -274,12 +278,76 @@ def evaluate_exam():
             
         return jsonify({
             'success': True,
+            'evaluation_id': evaluation_id,
             'total_score': total_score,
             'total_max': total_max,
             'ocr_extracted': ocr_text,
             'results': results
         })
         
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/override_score', methods=['POST'])
+def override_score():
+    try:
+        data = request.json
+        evaluation_id = data.get('evaluation_id')
+        q_num = data.get('q_num')
+        new_score = data.get('new_score')
+        
+        if evaluation_id is None or q_num is None or new_score is None:
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        new_total = db_manager.override_score(evaluation_id, q_num, int(new_score))
+        return jsonify({'success': True, 'new_total': new_total})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/export_csv', methods=['GET'])
+def export_csv():
+    import csv, io
+    from flask import Response
+    exam_id = request.args.get('exam_id')
+    try:
+        conn = db_manager._get_conn()
+        cursor = conn.cursor()
+        
+        query_filter = "WHERE exam_id = ?" if exam_id else ""
+        params = (exam_id,) if exam_id else ()
+        
+        cursor.execute(f'''
+            SELECT student_id, exam_id, total_score, total_max, grading_mode, created_at
+            FROM (
+                SELECT *, ROW_NUMBER() OVER(PARTITION BY student_id ORDER BY created_at DESC) as rn
+                FROM evaluations
+                {query_filter}
+            )
+            WHERE rn = 1
+            ORDER BY student_id ASC
+        ''', params)
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Student ID', 'Exam ID', 'Total Score', 'Max Score', 'Percentage', 'Grading Mode', 'Date'])
+        
+        for row in rows:
+            student_id, eid, score, max_score, mode, date = row
+            pct = round((score / max_score * 100), 2) if max_score > 0 else 0
+            writer.writerow([student_id, eid, score, max_score, f"{pct}%", mode, date])
+            
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=gradebook_export.csv"}
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()

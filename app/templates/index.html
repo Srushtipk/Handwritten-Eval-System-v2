@@ -225,6 +225,12 @@
                 
                 <!-- Analytics Dashboard Container -->
                 <div id="analyticsContent" class="hidden flex-1 flex flex-col space-y-6">
+                    <div class="flex justify-end mb-2">
+                        <button onclick="downloadCSV()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Download as CSV
+                        </button>
+                    </div>
                     <!-- Stats Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="bg-slate-50 dark:bg-[#0B0B2A] rounded-2xl p-5 border border-slate-200 dark:border-[#1E2954] shadow-sm flex flex-col justify-center">
@@ -338,6 +344,14 @@
         const folderLabel = document.getElementById('folderLabel');
         const usnContainer = document.getElementById('usnContainer');
         const dropZonePdf = document.getElementById('dropZonePdf');
+
+        function downloadCSV() {
+            let url = '/api/export_csv';
+            if (fileScheme.files.length > 0) {
+                url += '?exam_id=' + encodeURIComponent(fileScheme.files[0].name);
+            }
+            window.location.href = url;
+        }
 
         // Theme Toggle Logic
         const themeToggleBtn = document.getElementById('themeToggle');
@@ -754,12 +768,35 @@
                 
                 let answerText = res.extracted_answer ? res.extracted_answer : 'No answer provided';
                 
-                const html = '<div class="bg-white dark:bg-[#121B3A] border-y border-r border-slate-100 dark:border-y-[#1E2954] dark:border-r-[#1E2954] border-l-4 border-l-blue-500 dark:border-l-orange-500 rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-lg dark:shadow-black/50 hover:shadow-xl hover:shadow-blue-500/10 hover:dark:shadow-orange-500/20 transition-shadow duration-300">' +
+                let reviewBadgeHtml = '';
+                let overrideHtml = '';
+                let borderClass = 'border-l-blue-500 dark:border-l-orange-500';
+                let bgClass = 'bg-white dark:bg-[#121B3A]';
+                
+                if (res.needs_review) {
+                    borderClass = 'border-l-yellow-400 dark:border-l-yellow-500';
+                    bgClass = 'bg-yellow-50/30 dark:bg-yellow-900/10';
+                    reviewBadgeHtml = '<span class="text-[10px] font-bold text-yellow-700 dark:text-yellow-400 ml-3 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded-md uppercase border border-yellow-300">⚠️ Requires Manual Review</span>';
+                    
+                    overrideHtml = `
+                    <div class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-700/50 flex items-center justify-between">
+                        <div>
+                            <h5 class="text-sm font-bold text-yellow-800 dark:text-yellow-400">Manual Grade Override</h5>
+                            <p class="text-xs text-yellow-600 dark:text-yellow-500 mt-1">The AI confidence is low. Please review the student's answer and enter the correct score.</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <input type="number" id="override_q${res.q_num}" class="w-16 h-9 rounded-lg border border-yellow-300 dark:border-yellow-600 bg-white dark:bg-[#0B0B2A] text-center font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="${res.score}" min="0" max="${res.max_marks}">
+                            <button onclick="overrideScore(${data.evaluation_id}, ${res.q_num}, '${usn}')" class="h-9 px-4 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white font-bold text-sm shadow-sm transition-colors">Save</button>
+                        </div>
+                    </div>`;
+                }
+                
+                const html = '<div id="qcard_' + res.q_num + '" class="' + bgClass + ' border-y border-r border-slate-100 dark:border-y-[#1E2954] dark:border-r-[#1E2954] border-l-4 ' + borderClass + ' rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-lg dark:shadow-black/50 hover:shadow-xl hover:shadow-blue-500/10 hover:dark:shadow-orange-500/20 transition-shadow duration-300">' +
                     '<div class="p-6 border-b border-slate-100 dark:border-[#1E2954] bg-slate-50/50 dark:bg-[#0B0B2A]/50 flex flex-col md:flex-row justify-between items-start gap-4">' +
                         '<div class="flex-1">' +
                             '<div class="flex items-center mb-2">' +
                                 '<span class="w-8 h-8 rounded-full bg-blue-100 dark:bg-orange-500/20 text-blue-600 dark:text-orange-500 flex items-center justify-center text-xs font-bold mr-3">Q' + res.q_num + '</span>' +
-                                penaltyHtml +
+                                penaltyHtml + reviewBadgeHtml +
                             '</div>' +
                             '<h4 class="text-base font-semibold text-slate-800 dark:text-white leading-snug">' + res.question + '</h4>' +
                         '</div>' +
@@ -780,6 +817,7 @@
                                 traceHtml +
                             '</div>' +
                         '</div>' +
+                        overrideHtml +
                     '</div>' +
                 '</div>';
                 questionsList.insertAdjacentHTML('beforeend', html);
@@ -789,6 +827,57 @@
             reportContent.classList.remove('hidden');
             showDetailedView();
         }
+
+        window.overrideScore = async function(evalId, qNum, usn) {
+            const input = document.getElementById('override_q' + qNum);
+            const newScore = input.value;
+            if (newScore === '') return;
+            
+            try {
+                const res = await fetch('/api/override_score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ evaluation_id: evalId, q_num: qNum, new_score: newScore })
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    // Update local data
+                    const studentData = batchResults[usn].data;
+                    studentData.total_score = result.new_total;
+                    const qObj = studentData.results.find(q => q.q_num === qNum);
+                    if (qObj) {
+                        qObj.score = parseInt(newScore);
+                        qObj.needs_review = false;
+                    }
+                    
+                    // Re-render the detailed report
+                    renderDetailedReport(usn, studentData, batchResults[usn].ocrText);
+                    
+                    // Also re-render the batch table row if it exists
+                    const rowId = `row_${usn.replace(/\s+/g, '_')}`;
+                    const row = document.getElementById(rowId);
+                    if (row) {
+                        const needsReview = studentData.results.some(q => q.needs_review);
+                        let statusBadge = '<span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase tracking-wider">Graded</span>';
+                        if (needsReview) {
+                            statusBadge = '<span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 text-xs font-bold uppercase tracking-wider">⚠️ Needs Review</span>';
+                        }
+                        row.innerHTML = `<td class="px-6 py-4 font-bold text-slate-800 dark:text-white">${usn}</td>` +
+                            `<td class="px-6 py-4 text-slate-900 dark:text-slate-300 font-extrabold">${studentData.total_score} / ${studentData.total_max}</td>` +
+                            `<td class="px-6 py-4">${statusBadge}</td>` +
+                            `<td class="px-6 py-4 text-right space-x-2">` +
+                                `<button onclick="viewStudentDetails('${usn}')" class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-[#1E2954] text-blue-600 dark:text-orange-400 text-xs font-bold rounded-lg transition">🔍 View</button>` +
+                                `<button onclick="downloadStudentPDF('${usn}')" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold rounded-lg transition">📥 Export PDF</button>` +
+                            `</td>`;
+                    }
+                } else {
+                    alert('Failed to override score: ' + result.error);
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        };
 
         window.viewStudentDetails = function(usn) {
             const student = batchResults[usn];
@@ -951,11 +1040,18 @@
                         // Save in local state
                         batchResults[usn] = { data: data, ocrText: extractData.ocr_text };
                         
+                        // Check if any question needs review
+                        const needsReview = data.results.some(q => q.needs_review);
+                        let statusBadge = '<span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase tracking-wider">Graded</span>';
+                        if (needsReview) {
+                            statusBadge = '<span class="px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300 text-xs font-bold uppercase tracking-wider">⚠️ Needs Review</span>';
+                        }
+                        
                         // Update visual row to graded
                         const row = document.getElementById(rowId);
                         row.innerHTML = `<td class="px-6 py-4 font-bold text-slate-800 dark:text-white">${usn}</td>` +
                             `<td class="px-6 py-4 text-slate-900 dark:text-slate-300 font-extrabold">${data.total_score} / ${data.total_max}</td>` +
-                            `<td class="px-6 py-4"><span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase tracking-wider">Graded</span></td>` +
+                            `<td class="px-6 py-4">${statusBadge}</td>` +
                             `<td class="px-6 py-4 text-right space-x-2">` +
                                 `<button onclick="viewStudentDetails('${usn}')" class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-[#1E2954] text-blue-600 dark:text-orange-400 text-xs font-bold rounded-lg transition">🔍 View</button>` +
                                 `<button onclick="downloadStudentPDF('${usn}')" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold rounded-lg transition">📥 Export PDF</button>` +
