@@ -38,22 +38,10 @@ class HandwrittenEvaluator:
         
         emb_student = self.embedding_model.encode(student_answer, convert_to_tensor=True)
         cosine_scores = util.cos_sim(emb_ideal, emb_student)
-        # 1. Semantic Similarity
-        semantic_score = cosine_scores[0][0].item()
-        
-        # 2. Keyword Overlap Score (Factual Precision)
-        ideal_words = set(re.findall(r'\b\w{4,}\b', ideal_answer.lower()))
-        student_words = set(re.findall(r'\b\w{4,}\b', student_answer.lower()))
-        if not ideal_words:
-            keyword_score = 1.0
-        else:
-            matches = ideal_words.intersection(student_words)
-            keyword_score = len(matches) / len(ideal_words)
-            
-        # 3. True Hybrid Calculation
-        raw_score = (semantic_score * 0.5) + (keyword_score * 0.5)
+        raw_score = cosine_scores[0][0].item()
         
         # Median Strictness Normalization Mapping:
+        # Based on all-MiniLM-L6-v2 empirical testing: 0.70+ is an excellent match, ~0.30 is poor.
         if grading_mode == 'lenient':
             threshold_min = 0.20
             threshold_max = 0.60
@@ -69,13 +57,17 @@ class HandwrittenEvaluator:
             normalized_score = (raw_score - threshold_min) / (threshold_max - threshold_min)
             
         # Length-based Completeness Factor:
-        student_word_list = re.findall(r'\b\w+\b', student_answer.lower())
-        ideal_word_list = re.findall(r'\b\w+\b', ideal_answer.lower())
+        # If a student answer is extremely short, it cannot be a complete answer
+        # even if it has high semantic similarity to a key sentence.
+        student_words = re.findall(r'\b\w+\b', student_answer.lower())
+        ideal_words = re.findall(r'\b\w+\b', ideal_answer.lower())
         
-        if len(ideal_word_list) > 10 and grading_mode != 'lenient':
-            target_length = max(8, int(len(ideal_word_list) * 0.65))
-            length_ratio = len(student_word_list) / target_length
+        if len(ideal_words) > 10 and grading_mode != 'lenient':
+            # We expect the student's answer to have at least 65% of the ideal answer's word count.
+            target_length = max(8, int(len(ideal_words) * 0.65))
+            length_ratio = len(student_words) / target_length
             completeness_factor = min(1.0, length_ratio)
+            # Smooth the factor so it doesn't penalize slightly concise answers too heavily (0.2 baseline)
             completeness_factor = 0.2 + 0.8 * completeness_factor
             normalized_score = normalized_score * completeness_factor
             
