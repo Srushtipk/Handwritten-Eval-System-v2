@@ -93,9 +93,12 @@ def process_pdf(pdf_path: str) -> str:
             
         print(f"Sending {len(images)} pages to Gemini in a single multi-modal request...")
         full_text = extract_text_with_gemini(images)
+        doc.close()
         return full_text
     except Exception as e:
         traceback.print_exc()
+        try: doc.close() 
+        except: pass
         return f"ERROR processing PDF: {str(e)}"
 
 def segment_answers_with_gemini(raw_text: str, questions_list: list) -> dict:

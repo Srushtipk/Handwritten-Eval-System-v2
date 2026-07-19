@@ -318,10 +318,17 @@
         let fileSchemeInput = document.getElementById('fileScheme');
         let btnStandardize = document.getElementById('btnStandardize');
         let standardizedBlob = null; 
+        
+        // Cache to prevent re-uploading and re-OCRing when just changing grading modes
+        let globalExtractData = null;
+        let lastSchemeFile = null;
+        let lastPdfFile = null;
+        let lastStandardizedBlob = null;
 
         // File Selection UI
         fileSchemeInput.addEventListener('change', (e) => {
             standardizedBlob = null; 
+            globalExtractData = null; // Clear cache on new file
             if(e.target.files[0]) {
                 schemeLabel.innerText = e.target.files[0].name;
                 btnStandardize.classList.remove('hidden');
@@ -361,6 +368,7 @@
         });
 
         filePdf.addEventListener('change', (e) => {
+            globalExtractData = null; // Clear cache on new file
             if(e.target.files[0]) pdfName.innerText = e.target.files[0].name;
             else pdfName.innerText = 'Student Answer (PDF)';
         });
@@ -428,13 +436,23 @@
             btnRun.classList.add('opacity-70', 'cursor-not-allowed');
             emptyResults.classList.add('hidden');
             reportContent.classList.add('hidden');
-            setStatus('Extracting', 'loading');
             
             try {
-                const extractRes = await fetch('/api/extract', { method: 'POST', body: formData });
-                const extractData = await extractRes.json();
+                let extractData = globalExtractData;
                 
-                if(!extractRes.ok) throw new Error(extractData.error || "Extraction failed");
+                // Only upload and extract if files changed or no cache exists
+                if (!extractData || lastSchemeFile !== fileScheme.files[0] || lastPdfFile !== filePdf.files[0] || lastStandardizedBlob !== standardizedBlob) {
+                    setStatus('Extracting', 'loading');
+                    const extractRes = await fetch('/api/extract', { method: 'POST', body: formData });
+                    extractData = await extractRes.json();
+                    
+                    if(!extractRes.ok) throw new Error(extractData.error || "Extraction failed");
+                    
+                    globalExtractData = extractData;
+                    lastSchemeFile = fileScheme.files[0];
+                    lastPdfFile = filePdf.files[0];
+                    lastStandardizedBlob = standardizedBlob;
+                }
                 
                 rawOcrText.innerText = extractData.ocr_text;
                 reportContent.classList.remove('hidden');
@@ -447,7 +465,7 @@
                 const evalPayload = {
                     ocr_text: extractData.ocr_text,
                     questions: extractData.questions,
-                    grading_mode: extractData.grading_mode,
+                    grading_mode: gradingMode.value, // Read CURRENT dropdown value
                     exam_max_marks: examMaxMarks.value.trim()
                 };
                 

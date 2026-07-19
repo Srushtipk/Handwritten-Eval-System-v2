@@ -28,8 +28,25 @@ class HandwrittenEvaluator:
         
         emb_student = self.embedding_model.encode(student_answer, convert_to_tensor=True)
         cosine_scores = util.cos_sim(emb_ideal, emb_student)
-        raw_score = cosine_scores[0][0].item()
-        return min(1.0, raw_score * 1.2)
+        semantic_score = cosine_scores[0][0].item()
+        
+        # 2. Keyword Overlap Score (Factual Precision)
+        # Extract meaningful words (length > 3) to ignore stop words
+        ideal_words = set(re.findall(r'\b\w{4,}\b', ideal_answer.lower()))
+        student_words = set(re.findall(r'\b\w{4,}\b', student_answer.lower()))
+        if not ideal_words:
+            keyword_score = 1.0
+        else:
+            matches = ideal_words.intersection(student_words)
+            keyword_score = len(matches) / len(ideal_words)
+            
+        # 3. True Hybrid Calculation
+        # A good paper will have High Semantic AND High Keyword Overlap.
+        # A mediocre paper (fluff) will have High Semantic but LOW Keyword Overlap.
+        # Weighting: 50% semantic meaning, 50% technical keyword precision.
+        raw_score = (semantic_score * 0.5) + (keyword_score * 0.5)
+        
+        return min(1.0, raw_score * 1.4)
 
     def _run_hybrid_text_eval(self, ideal_rubric, ocr_text, text_max_marks, ans_type, grading_mode='experienced'):
         if text_max_marks <= 0: return 0.0

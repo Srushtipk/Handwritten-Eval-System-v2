@@ -1,7 +1,13 @@
 import docx
-import json
-
-doc = docx.Document('data/uploads/Question.docx')
-lines = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-with open('test_dump.json', 'w', encoding='utf-8') as f:
-    json.dump(lines, f, indent=2)
+doc = docx.Document('IA2-Scheme.docx')
+text = []
+for para in doc.paragraphs:
+    if para.text.strip():
+        text.append(para.text.strip())
+for table in doc.tables:
+    for row in table.rows:
+        row_text = " | ".join([cell.text.strip().replace('\n', ' ') for cell in row.cells if cell.text.strip()])
+        if row_text:
+            text.append(row_text)
+with open('dump.txt', 'w', encoding='utf-8') as f:
+    f.write('\n'.join(text))

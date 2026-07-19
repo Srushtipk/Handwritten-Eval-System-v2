@@ -35,16 +35,71 @@ class SchemeParser:
         if not questions:
             questions = self._parse_academic_format(doc)
             
-        # Strategy 3: The Gemini LLM Fallback (for messy unstructured rubrics)
+        # Strategy 3: Tabular format (Q. No | Sub | Text | Marks)
+        if not questions:
+            questions = self._parse_table_format(doc)
+            
+        # Strategy 4: The Gemini LLM Fallback (for messy unstructured rubrics)
         if not questions and api_key:
             questions = self._parse_with_gemini(doc)
             
         return questions
         
+    def _extract_all_text_blocks(self, doc):
+        blocks = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                blocks.append(para.text.strip())
+        for table in doc.tables:
+            for row in table.rows:
+                # Merge cell texts in a row
+                row_text = " | ".join([cell.text.strip() for cell in row.cells if cell.text.strip()])
+                if row_text:
+                    blocks.append(row_text)
+        return blocks
+        
+    def _parse_table_format(self, doc):
+        """Parses academic marking schemes that use tables with distinct columns."""
+        questions = []
+        for table in doc.tables:
+            for row in table.rows:
+                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if len(cells) >= 3:
+                    q_col = cells[0].lower().replace('q', '').strip()
+                    # Check if first column is a question number
+                    if re.match(r'^\d+$', q_col):
+                        q_id = q_col
+                        # Handle Sub-question (like 'a)' or 'b')
+                        if re.match(r'^[a-z]\)?$', cells[1].lower()):
+                            q_id += cells[1].replace(')', '')
+                            text_cell = cells[2]
+                            marks_cell = cells[3] if len(cells) > 3 else "10"
+                        else:
+                            text_cell = cells[1]
+                            marks_cell = cells[2]
+                            
+                        # Extract max marks safely
+                        marks = 10
+                        m = re.search(r'(\d+)', marks_cell)
+                        if m: marks = int(m.group(1))
+                        
+                        # Separate question title from the rest of the answer text
+                        lines = [line.strip() for line in text_cell.split('\n') if line.strip()]
+                        q_title = lines[0] if lines else "Question"
+                        
+                        questions.append({
+                            'id': q_id,
+                            'question': q_title,
+                            'max_marks': marks,
+                            'type': 'flexible',
+                            'answer': text_cell
+                        })
+        return questions
+        
     def _parse_with_gemini(self, doc):
         """Uses Gemini to intelligently extract questions and answers from a messy DOCX."""
         print("Regex parsers failed. Engaging Gemini LLM fallback for scheme extraction...")
-        full_text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+        full_text = "\n".join(self._extract_all_text_blocks(doc))
         
         prompt = (
             "You are an expert exam evaluator parsing a university marking scheme/rubric.\n"
@@ -63,24 +118,28 @@ class SchemeParser:
             f"--- MARKING SCHEME TEXT ---\n{full_text}"
         )
         
-        try:
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model='gemini-3.5-flash',
-                contents=prompt
-            )
-            
-            raw = response.text.strip()
-            if raw.startswith("```json"):
-                raw = raw[7:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
+        import time
+        for attempt in range(3):
+            try:
+                client = genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt
+                )
                 
-            questions = json.loads(raw.strip())
-            return questions
-        except Exception as e:
-            print(f"Gemini fallback failed: {e}")
-            return []
+                raw = response.text.strip()
+                if raw.startswith("```json"):
+                    raw = raw[7:]
+                if raw.endswith("```"):
+                    raw = raw[:-3]
+                    
+                questions = json.loads(raw.strip())
+                return questions
+            except Exception as e:
+                print(f"Gemini fallback attempt {attempt+1} failed: {e}")
+                if attempt < 2:
+                    time.sleep(2)
+        return []
 
     def _parse_standard_format(self, doc):
         questions = []
@@ -102,8 +161,7 @@ class SchemeParser:
                 elif current_key == 'answer':
                     current_question['answer'] = val
             
-        for para in doc.paragraphs:
-            text_block = para.text.strip()
+        for text_block in self._extract_all_text_blocks(doc):
             if not text_block: continue
                 
             for text in text_block.split('\n'):
@@ -154,8 +212,7 @@ class SchemeParser:
         q_start_pattern = re.compile(r'^(?:Q\s*)?(\d+\s*[a-z]?\))\s*(.*)', re.IGNORECASE)
         marks_pattern = re.compile(r'marks\s*allotted:\s*(\d+)', re.IGNORECASE)
         
-        for para in doc.paragraphs:
-            text_block = para.text.strip()
+        for text_block in self._extract_all_text_blocks(doc):
             if not text_block: continue
             
             for text in text_block.split('\n'):
