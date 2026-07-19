@@ -93,11 +93,20 @@
             <div id="setupPanel" class="lg:col-span-4 flex flex-col space-y-6 transition-all duration-300">
                 
                 <div class="bg-white/80 backdrop-blur-xl dark:bg-[#121B3A]/90 dark:backdrop-blur-xl rounded-3xl p-8 shadow-xl shadow-blue-900/5 dark:shadow-2xl dark:shadow-black/60 border border-slate-100 dark:border-[#1E2954]">
-                    <div class="flex items-center space-x-3 mb-8">
-                        <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-orange-500/10 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-blue-600 dark:text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-xl bg-blue-50 dark:bg-orange-500/10 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-blue-600 dark:text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            </div>
+                            <h2 class="text-lg font-bold text-slate-800 dark:text-white">Setup Evaluation</h2>
                         </div>
-                        <h2 class="text-lg font-bold text-slate-800 dark:text-white">Setup Evaluation</h2>
+                    </div>
+                    
+                    <!-- Mode Selector Tab -->
+                    <div class="flex bg-slate-100 dark:bg-[#0B0B2A] p-1 rounded-xl mb-6">
+                        <button id="tabSingle" class="flex-1 text-center py-2 text-xs font-bold rounded-lg bg-white dark:bg-[#1E2954] text-blue-600 dark:text-white shadow-sm transition">Single Paper</button>
+                        <button id="tabBatch" class="flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition">Batch Folder</button>
+                        <button id="tabAnalytics" class="flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition">📊 Analytics</button>
                     </div>
 
                     <div id="dropZoneScheme" class="relative mb-5 border-2 border-dashed border-slate-200 dark:border-[#1E2954] rounded-2xl p-6 text-center hover:border-blue-500 dark:hover:border-orange-500 transition-colors bg-slate-50/50 dark:bg-[#0B0B2A]/50 group">
@@ -126,8 +135,20 @@
                         <input type="file" id="filePdf" accept=".pdf" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10">
                     </div>
 
+                    <div id="dropZoneFolder" class="hidden relative mb-6 border-2 border-dashed border-slate-200 dark:border-[#1E2954] rounded-2xl p-6 text-center hover:border-blue-500 dark:hover:border-orange-500 transition-colors bg-slate-50/50 dark:bg-[#0B0B2A]/50 group">
+                        <label for="fileFolder" class="cursor-pointer block w-full h-full">
+                            <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-6 h-6 text-blue-600 dark:text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                            </div>
+                            <span id="folderLabel" class="text-slate-700 dark:text-slate-200 font-semibold text-sm block mb-1">Classroom Folder</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-500">Click to upload USN.pdf folder</span>
+                        </label>
+                        <!-- webkitdirectory directory multiple are html5 specs for folder uploading -->
+                        <input type="file" id="fileFolder" webkitdirectory directory multiple accept=".pdf" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10">
+                    </div>
+
                     <div class="space-y-5">
-                        <div>
+                        <div id="usnContainer">
                             <label class="block text-slate-700 dark:text-slate-300 text-sm font-semibold mb-2">Student Roll No.</label>
                             <input type="text" id="studentUSN" placeholder="e.g. 1RV20CS001" class="w-full bg-slate-50 dark:bg-[#0B0B2A] border border-slate-200 dark:border-[#1E2954] rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none focus:border-blue-500 dark:focus:border-orange-500 transition-colors placeholder-slate-400 dark:placeholder-slate-500">
                         </div>
@@ -182,6 +203,63 @@
                     </div>
                     <p class="text-base font-medium">Your evaluation results will appear here.</p>
                 </div>
+
+                <!-- Batch Gradebook View Container -->
+                <div id="batchReportContent" class="hidden flex-1 flex flex-col">
+                    <div class="overflow-x-auto bg-slate-50/50 dark:bg-[#0b0b2a]/30 rounded-2xl border border-slate-100 dark:border-[#1e2954]">
+                        <table class="min-w-full divide-y divide-slate-100 dark:divide-[#1e2954] text-sm">
+                            <thead class="bg-slate-50 dark:bg-[#121b3a]">
+                                <tr>
+                                    <th class="px-6 py-4 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px]">USN / Student ID</th>
+                                    <th class="px-6 py-4 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px]">Overall Score</th>
+                                    <th class="px-6 py-4 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px]">Status</th>
+                                    <th class="px-6 py-4 text-right font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-[10px]">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batchGradebookList" class="divide-y divide-slate-100 dark:divide-[#1e2954]">
+                                <!-- Rows dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Analytics Dashboard Container -->
+                <div id="analyticsContent" class="hidden flex-1 flex flex-col space-y-6">
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-slate-50 dark:bg-[#0B0B2A] rounded-2xl p-5 border border-slate-200 dark:border-[#1E2954] shadow-sm flex flex-col justify-center">
+                            <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Submissions</h3>
+                            <div class="text-3xl font-black text-slate-900 dark:text-white" id="analyticsTotalSubmissions">-</div>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-[#0B0B2A] rounded-2xl p-5 border border-slate-200 dark:border-[#1E2954] shadow-sm flex flex-col justify-center">
+                            <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Class Average</h3>
+                            <div class="text-3xl font-black text-slate-900 dark:text-white" id="analyticsClassAverage">-<span class="text-lg text-slate-500 ml-1">%</span></div>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-[#0B0B2A] rounded-2xl p-5 border border-slate-200 dark:border-[#1E2954] shadow-sm flex flex-col justify-center">
+                            <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Highest Score</h3>
+                            <div class="text-3xl font-black text-slate-900 dark:text-white" id="analyticsHighestScore">-<span class="text-lg text-slate-500 ml-1">%</span></div>
+                            <div class="text-[11px] font-bold text-blue-500 mt-1 truncate" id="analyticsHighestUSN"></div>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-[#0B0B2A] rounded-2xl p-5 border border-slate-200 dark:border-[#1E2954] shadow-sm flex flex-col justify-center">
+                            <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Lowest Score</h3>
+                            <div class="text-3xl font-black text-slate-900 dark:text-white" id="analyticsLowestScore">-<span class="text-lg text-slate-500 ml-1">%</span></div>
+                            <div class="text-[11px] font-bold text-orange-500 mt-1 truncate" id="analyticsLowestUSN"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Hardest Questions List -->
+                    <div class="bg-slate-50/50 dark:bg-[#0b0b2a]/30 rounded-2xl border border-slate-100 dark:border-[#1e2954] overflow-hidden shadow-sm flex-1 flex flex-col">
+                        <div class="px-6 py-5 border-b border-slate-100 dark:border-[#1e2954] bg-white dark:bg-[#121B3A]">
+                            <h3 class="font-bold text-slate-800 dark:text-white text-base">Question Difficulty Analysis</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Questions sorted by lowest average score</p>
+                        </div>
+                        <div class="p-6 flex-1 overflow-y-auto">
+                            <ul id="analyticsQuestionsList" class="space-y-4">
+                                <!-- Dynamic items -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
                 
                 <div id="reportContent" class="hidden flex-1 flex flex-col">
                     <div class="flex justify-end mb-4">
@@ -230,6 +308,9 @@
         </div>
     </div>
 
+    <!-- Hidden Offscreen Container for Direct PDF Exporting -->
+    <div id="hiddenPrintContainer" class="hidden"></div>
+
     <!-- Scripts (Functionality Preserved) -->
     <script>
         const fileScheme = document.getElementById('fileScheme');
@@ -252,6 +333,11 @@
         const reportPanel = document.getElementById('reportPanel');
         const btnBackToSetup = document.getElementById('btnBackToSetup');
         const btnViewDetails = document.getElementById('btnViewDetails');
+        const batchReportContent = document.getElementById('batchReportContent');
+        const dropZoneFolder = document.getElementById('dropZoneFolder');
+        const folderLabel = document.getElementById('folderLabel');
+        const usnContainer = document.getElementById('usnContainer');
+        const dropZonePdf = document.getElementById('dropZonePdf');
 
         // Theme Toggle Logic
         const themeToggleBtn = document.getElementById('themeToggle');
@@ -259,6 +345,8 @@
         const themeToggleLightIcon = document.getElementById('themeToggleLightIcon');
 
         // Navigation Logic
+        let viewState = 'gradebook'; // 'setup', 'gradebook', 'report'
+
         function showDetailedView() {
             setupPanel.classList.add('hidden');
             reportPanel.classList.remove('lg:col-span-8');
@@ -269,12 +357,34 @@
         }
 
         function showCompactView() {
-            setupPanel.classList.remove('hidden');
-            reportPanel.classList.remove('lg:col-span-12');
-            reportPanel.classList.add('lg:col-span-8');
-            btnBackToSetup.classList.add('hidden');
-            btnViewDetails.classList.remove('hidden');
-            document.querySelectorAll('.details-section').forEach(el => el.classList.add('hidden'));
+            if (currentMode === 'batch') {
+                if (viewState === 'report') {
+                    // Go back to the Gradebook table view (keep it full screen for clarity)
+                    viewState = 'gradebook';
+                    document.getElementById('reportContent').classList.add('hidden');
+                    document.getElementById('batchReportContent').classList.remove('hidden');
+                    btnBackToSetup.classList.remove('hidden'); // Remains to let them go back to setup
+                } else {
+                    // Go back to Setup from Gradebook
+                    viewState = 'setup';
+                    document.getElementById('batchReportContent').classList.add('hidden');
+                    document.getElementById('emptyResults').classList.remove('hidden');
+                    
+                    setupPanel.classList.remove('hidden');
+                    reportPanel.classList.remove('lg:col-span-12');
+                    reportPanel.classList.add('lg:col-span-8');
+                    btnBackToSetup.classList.add('hidden');
+                }
+                btnViewDetails.classList.add('hidden');
+            } else {
+                viewState = 'setup';
+                setupPanel.classList.remove('hidden');
+                reportPanel.classList.remove('lg:col-span-12');
+                reportPanel.classList.add('lg:col-span-8');
+                btnBackToSetup.classList.add('hidden');
+                btnViewDetails.classList.remove('hidden');
+                document.querySelectorAll('.details-section').forEach(el => el.classList.add('hidden'));
+            }
         }
 
         btnBackToSetup.addEventListener('click', showCompactView);
@@ -373,9 +483,120 @@
             else pdfName.innerText = 'Student Answer (PDF)';
         });
 
+        const fileFolderInput = document.getElementById('fileFolder');
+        fileFolderInput.addEventListener('change', (e) => {
+            const pdfFiles = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+            if(pdfFiles.length > 0) {
+                folderLabel.innerText = pdfFiles.length + ' PDF(s) Selected';
+            } else {
+                folderLabel.innerText = 'Classroom Folder';
+            }
+        });
+
+        // Tab switches
+        const tabSingle = document.getElementById('tabSingle');
+        const tabBatch = document.getElementById('tabBatch');
+        const tabAnalytics = document.getElementById('tabAnalytics');
+        let currentMode = 'single'; // 'single', 'batch', 'analytics'
+
+        tabSingle.addEventListener('click', () => {
+            currentMode = 'single';
+            tabSingle.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg bg-white dark:bg-[#1E2954] text-blue-600 dark:text-white shadow-sm transition";
+            tabBatch.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition";
+            tabAnalytics.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition";
+            
+            dropZonePdf.classList.remove('hidden');
+            usnContainer.classList.remove('hidden');
+            dropZoneFolder.classList.add('hidden');
+            btnRun.classList.remove('hidden');
+            
+            document.getElementById('reportContent').classList.add('hidden');
+            document.getElementById('batchReportContent').classList.add('hidden');
+            document.getElementById('analyticsContent').classList.add('hidden');
+            document.getElementById('emptyResults').classList.remove('hidden');
+            showCompactView();
+        });
+
+        tabBatch.addEventListener('click', () => {
+            currentMode = 'batch';
+            tabBatch.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg bg-white dark:bg-[#1E2954] text-blue-600 dark:text-white shadow-sm transition";
+            tabSingle.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition";
+            tabAnalytics.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition";
+            
+            dropZonePdf.classList.add('hidden');
+            usnContainer.classList.add('hidden');
+            dropZoneFolder.classList.remove('hidden');
+            btnRun.classList.remove('hidden');
+            
+            document.getElementById('reportContent').classList.add('hidden');
+            document.getElementById('batchReportContent').classList.add('hidden');
+            document.getElementById('analyticsContent').classList.add('hidden');
+            document.getElementById('emptyResults').classList.remove('hidden');
+            showCompactView();
+        });
+        
+        tabAnalytics.addEventListener('click', async () => {
+            currentMode = 'analytics';
+            tabAnalytics.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg bg-white dark:bg-[#1E2954] text-blue-600 dark:text-white shadow-sm transition";
+            tabSingle.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition";
+            tabBatch.className = "flex-1 text-center py-2 text-xs font-bold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 transition";
+            
+            dropZonePdf.classList.add('hidden');
+            usnContainer.classList.add('hidden');
+            dropZoneFolder.classList.add('hidden');
+            btnRun.classList.add('hidden'); // Hide run button
+            
+            document.getElementById('reportContent').classList.add('hidden');
+            document.getElementById('batchReportContent').classList.add('hidden');
+            document.getElementById('emptyResults').classList.add('hidden');
+            document.getElementById('analyticsContent').classList.remove('hidden');
+            
+            showCompactView();
+            setStatus('Loading Analytics...', 'loading');
+            
+            try {
+                let url = '/api/analytics';
+                if (fileScheme.files.length > 0) {
+                    url += '?exam_id=' + encodeURIComponent(fileScheme.files[0].name);
+                }
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                document.getElementById('analyticsTotalSubmissions').innerText = data.total_submissions;
+                document.getElementById('analyticsClassAverage').innerHTML = data.class_average + '<span class="text-lg text-slate-500 dark:text-slate-400 ml-1">%</span>';
+                document.getElementById('analyticsHighestScore').innerHTML = data.highest_score + '<span class="text-lg text-slate-500 dark:text-slate-400 ml-1">%</span>';
+                document.getElementById('analyticsHighestUSN').innerText = data.highest_score_usn ? '(' + data.highest_score_usn + ')' : '';
+                document.getElementById('analyticsLowestScore').innerHTML = data.lowest_score + '<span class="text-lg text-slate-500 dark:text-slate-400 ml-1">%</span>';
+                document.getElementById('analyticsLowestUSN').innerText = data.lowest_score_usn ? '(' + data.lowest_score_usn + ')' : '';
+                
+                const qList = document.getElementById('analyticsQuestionsList');
+                qList.innerHTML = '';
+                if (data.hardest_questions && data.hardest_questions.length > 0) {
+                    data.hardest_questions.forEach(q => {
+                        qList.innerHTML += `
+                            <li class="flex items-center justify-between p-4 bg-white dark:bg-[#121B3A] border border-slate-100 dark:border-[#1E2954] hover:shadow-md rounded-xl transition">
+                                <div>
+                                    <span class="font-bold text-slate-800 dark:text-white mr-2">Q${q.q_num}</span>
+                                    <span class="text-slate-600 dark:text-slate-300 text-sm font-medium">${q.question}</span>
+                                </div>
+                                <div class="font-black text-lg ${q.avg_score_pct < 50 ? 'text-orange-500' : 'text-blue-500'} bg-slate-50 dark:bg-[#0B0B2A] px-3 py-1 rounded-lg ml-4">
+                                    ${q.avg_score_pct}%
+                                </div>
+                            </li>
+                        `;
+                    });
+                } else {
+                    qList.innerHTML = '<li class="text-slate-500 text-sm italic">No question data available. Evaluate some papers first!</li>';
+                }
+                setStatus('Analytics Loaded', 'success');
+            } catch (err) {
+                console.error(err);
+                setStatus('Error Loading Analytics', 'error');
+            }
+        });
+
         // Drag and Drop Logic
         const dropZoneScheme = document.getElementById('dropZoneScheme');
-        const dropZonePdf = document.getElementById('dropZonePdf');
         
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZoneScheme.addEventListener(eventName, preventDefaults, false);
@@ -413,142 +634,344 @@
             else statusBadge.className = 'px-4 py-1.5 rounded-full bg-slate-100 dark:bg-[#0B0B2A] text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider';
         }
 
+
+        let batchResults = {}; // Map USN -> results payload
+        
+        // Dynamic HTML Generator helper
+        function generateReportHTML(usn, data) {
+            let questionsHtml = '';
+            data.results.forEach(res => {
+                let penaltyHtml = '';
+                if(res.penalty > 0) {
+                    penaltyHtml = '<span class="text-[10px] font-bold text-red-600 dark:text-red-400 ml-3 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase">Penalty</span>';
+
+                }
+                
+                let traceHtml = '';
+                if (res.trace && res.trace.length > 0) {
+                    traceHtml = res.trace.map(t => {
+                        let icon = t.status === 'success' ? '<span class="text-blue-500 dark:text-orange-500 mr-2">✓</span>' : (t.status === 'warning' ? '<span class="text-amber-500 mr-2">!</span>' : '<span class="text-red-500 mr-2">✗</span>');
+                        return '<div class="flex items-start mb-2">' + icon + '<span class="text-slate-600 dark:text-slate-300 font-medium">' + t.msg + '</span></div>';
+                    }).join('');
+                } else {
+                    traceHtml = '<div class="text-slate-500 dark:text-slate-400 font-medium">' + res.reasoning + '</div>';
+                }
+                
+                let answerText = res.extracted_answer ? res.extracted_answer : 'No answer provided';
+                
+                questionsHtml += '<div class="bg-white dark:bg-[#121B3A] border-y border-r border-slate-100 dark:border-y-[#1E2954] dark:border-r-[#1E2954] border-l-4 border-l-blue-500 dark:border-l-orange-500 rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-lg dark:shadow-black/50 hover:shadow-xl hover:shadow-blue-500/10 hover:dark:shadow-orange-500/20 transition-shadow duration-300 mb-6">' +
+                    '<div class="p-6 border-b border-slate-100 dark:border-[#1E2954] bg-slate-50/50 dark:bg-[#0B0B2A]/50 flex flex-col md:flex-row justify-between items-start gap-4">' +
+                        '<div class="flex-1">' +
+                            '<div class="flex items-center mb-2">' +
+                                '<span class="w-8 h-8 rounded-full bg-blue-100 dark:bg-orange-500/20 text-blue-600 dark:text-orange-500 flex items-center justify-center text-xs font-bold mr-3">Q' + res.q_num + '</span>' +
+                                penaltyHtml +
+                            '</div>' +
+                            '<h4 class="text-base font-semibold text-slate-800 dark:text-white leading-snug">' + res.question + '</h4>' +
+                        '</div>' +
+                        '<div class="text-left md:text-right shrink-0 mt-2 md:mt-0">' +
+                            '<div class="text-3xl font-black text-slate-900 dark:text-white">' + res.score + '<span class="text-sm font-semibold text-slate-400 dark:text-slate-500 ml-1">/ ' + res.max_marks + '</span></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="details-section p-6 space-y-6">' +
+                        '<div>' +
+                            '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Student Transcript</h5>' +
+                            '<div class="bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl text-sm text-slate-700 dark:text-slate-300 font-medium italic leading-relaxed tracking-wide shadow-inner border border-slate-200/60 dark:border-none">' +
+                                '"' + answerText + '"' +
+                            '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 012-2h2a2 2 0 012 2"></path></svg>Evaluation Trace (Review)</h5>' +
+                            '<div class="text-sm bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl shadow-inner border border-slate-200/60 dark:border-none">' +
+                                traceHtml +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            });
+
+            return '<div class="bg-blue-50 dark:bg-[#0B0B2A] rounded-2xl p-8 mb-8 flex flex-col md:flex-row items-center justify-between border-l-4 border-blue-600 dark:border-orange-500">' +
+                '<div>' +
+                    '<h3 class="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2">Student ID: <span class="text-slate-800 dark:text-white ml-1">' + usn + '</span></h3>' +
+                    '<p class="text-xs uppercase tracking-widest font-bold text-blue-600 dark:text-orange-500 mb-1">Final Graded Score</p>' +
+                    '<div class="flex items-baseline">' +
+                        '<h3 class="text-5xl font-black text-slate-900 dark:text-white tracking-tight">' + data.total_score + '</h3>' +
+                        '<span class="text-xl text-slate-500 dark:text-slate-400 font-medium ml-2">/ ' + data.total_max + '</span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="space-y-6">' + questionsHtml + '</div>';
+        }
+
+        window.downloadStudentPDF = function(usn) {
+            const student = batchResults[usn];
+            if (!student) return;
+            
+            const printContainer = document.getElementById('hiddenPrintContainer');
+            printContainer.innerHTML = generateReportHTML(usn, student.data);
+            printContainer.classList.remove('hidden');
+            
+            const opt = {
+                margin:       0.5,
+                filename:     usn + '_Grade_Report.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+            
+            html2pdf().set(opt).from(printContainer).save().then(() => {
+                printContainer.innerHTML = '';
+                printContainer.classList.add('hidden');
+            });
+        };
+        
+        function renderDetailedReport(usn, data, ocrText) {
+            viewState = 'report';
+            rawOcrText.innerText = ocrText;
+            displayUSN.classList.remove('hidden');
+            displayUSN.querySelector('span').innerText = usn;
+            
+            totalScore.innerText = data.total_score;
+            totalMaxMarksElem.innerText = '/ ' + data.total_max;
+            
+            questionsList.innerHTML = '';
+            
+            data.results.forEach(res => {
+                let penaltyHtml = '';
+                if(res.penalty > 0) {
+                    penaltyHtml = '<span class="text-[10px] font-bold text-red-600 dark:text-red-400 ml-3 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase">Penalty</span>';
+                }
+                
+                let traceHtml = '';
+                if (res.trace && res.trace.length > 0) {
+                    traceHtml = res.trace.map(t => {
+                        let icon = t.status === 'success' ? '<span class="text-blue-500 dark:text-orange-500 mr-2">✓</span>' : (t.status === 'warning' ? '<span class="text-amber-500 mr-2">!</span>' : '<span class="text-red-500 mr-2">✗</span>');
+                        return '<div class="flex items-start mb-2">' + icon + '<span class="text-slate-600 dark:text-slate-300 font-medium">' + t.msg + '</span></div>';
+                    }).join('');
+                } else {
+                    traceHtml = '<div class="text-slate-500 dark:text-slate-400 font-medium">' + res.reasoning + '</div>';
+                }
+                
+                let answerText = res.extracted_answer ? res.extracted_answer : 'No answer provided';
+                
+                const html = '<div class="bg-white dark:bg-[#121B3A] border-y border-r border-slate-100 dark:border-y-[#1E2954] dark:border-r-[#1E2954] border-l-4 border-l-blue-500 dark:border-l-orange-500 rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-lg dark:shadow-black/50 hover:shadow-xl hover:shadow-blue-500/10 hover:dark:shadow-orange-500/20 transition-shadow duration-300">' +
+                    '<div class="p-6 border-b border-slate-100 dark:border-[#1E2954] bg-slate-50/50 dark:bg-[#0B0B2A]/50 flex flex-col md:flex-row justify-between items-start gap-4">' +
+                        '<div class="flex-1">' +
+                            '<div class="flex items-center mb-2">' +
+                                '<span class="w-8 h-8 rounded-full bg-blue-100 dark:bg-orange-500/20 text-blue-600 dark:text-orange-500 flex items-center justify-center text-xs font-bold mr-3">Q' + res.q_num + '</span>' +
+                                penaltyHtml +
+                            '</div>' +
+                            '<h4 class="text-base font-semibold text-slate-800 dark:text-white leading-snug">' + res.question + '</h4>' +
+                        '</div>' +
+                        '<div class="text-left md:text-right shrink-0 mt-2 md:mt-0">' +
+                            '<div class="text-3xl font-black text-slate-900 dark:text-white">' + res.score + '<span class="text-sm font-semibold text-slate-400 dark:text-slate-500 ml-1">/ ' + res.max_marks + '</span></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="details-section p-6 space-y-6">' +
+                        '<div>' +
+                            '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Student Transcript</h5>' +
+                            '<div class="bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl text-sm text-slate-700 dark:text-slate-300 font-medium italic leading-relaxed tracking-wide shadow-inner border border-slate-200/60 dark:border-none">' +
+                                '"' + answerText + '"' +
+                            '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 012-2h2a2 2 0 012 2"></path></svg>Evaluation Trace (Review)</h5>' +
+                            '<div class="text-sm bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl shadow-inner border border-slate-200/60 dark:border-none">' +
+                                traceHtml +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+                questionsList.insertAdjacentHTML('beforeend', html);
+            });
+            
+            document.getElementById('batchReportContent').classList.add('hidden');
+            reportContent.classList.remove('hidden');
+            showDetailedView();
+        }
+
+        window.viewStudentDetails = function(usn) {
+            const student = batchResults[usn];
+            if (student) {
+                renderDetailedReport(usn, student.data, student.ocrText);
+            }
+        };
+
         btnRun.addEventListener('click', async () => {
-            if(!fileScheme.files[0] || !filePdf.files[0]) {
-                alert("Please upload BOTH the Scheme (DOCX) and the Student Answer (PDF).");
+            if(!fileScheme.files[0]) {
+                alert("Please upload the Marking Scheme (DOCX).");
                 return;
             }
-            
-            const formData = new FormData();
-            if (standardizedBlob) {
-                formData.append('scheme', standardizedBlob, schemeLabel.innerText);
-            } else {
-                formData.append('scheme', fileScheme.files[0]);
-            }
-            formData.append('student_pdf', filePdf.files[0]);
-            formData.append('grading_mode', gradingMode.value);
-            if (examMaxMarks.value.trim() !== '') {
-                formData.append('exam_max_marks', examMaxMarks.value.trim());
-            }
-            
-            btnRun.disabled = true;
-            btnRun.innerHTML = 'Processing...';
-            btnRun.classList.add('opacity-70', 'cursor-not-allowed');
-            emptyResults.classList.add('hidden');
-            reportContent.classList.add('hidden');
-            
-            try {
-                let extractData = globalExtractData;
+
+            if (currentMode === 'single') {
+                if(!filePdf.files[0]) {
+                    alert("Please upload the Student Answer (PDF).");
+                    return;
+                }
                 
-                // Only upload and extract if files changed or no cache exists
-                if (!extractData || lastSchemeFile !== fileScheme.files[0] || lastPdfFile !== filePdf.files[0] || lastStandardizedBlob !== standardizedBlob) {
-                    setStatus('Extracting', 'loading');
+                const formData = new FormData();
+                if (standardizedBlob) {
+                    formData.append('scheme', standardizedBlob, schemeLabel.innerText);
+                } else {
+                    formData.append('scheme', fileScheme.files[0]);
+                }
+                formData.append('student_pdf', filePdf.files[0]);
+                formData.append('grading_mode', gradingMode.value);
+                if (examMaxMarks.value.trim() !== '') {
+                    formData.append('exam_max_marks', examMaxMarks.value.trim());
+                }
+                
+                btnRun.disabled = true;
+                btnRun.innerHTML = 'Processing...';
+                btnRun.classList.add('opacity-70', 'cursor-not-allowed');
+                emptyResults.classList.add('hidden');
+                reportContent.classList.add('hidden');
+                batchReportContent.classList.add('hidden');
+                setStatus('Extracting', 'loading');
+                
+                try {
                     const extractRes = await fetch('/api/extract', { method: 'POST', body: formData });
-                    extractData = await extractRes.json();
+                    const extractData = await extractRes.json();
                     
                     if(!extractRes.ok) throw new Error(extractData.error || "Extraction failed");
                     
-                    globalExtractData = extractData;
-                    lastSchemeFile = fileScheme.files[0];
-                    lastPdfFile = filePdf.files[0];
-                    lastStandardizedBlob = standardizedBlob;
+                    rawOcrText.innerText = extractData.ocr_text;
+                    reportContent.classList.remove('hidden');
+                    totalScore.innerText = '-';
+                    totalMaxMarksElem.innerText = '/ -';
+                    questionsList.innerHTML = '<div class="py-12 text-center text-sm font-medium text-slate-500 dark:text-slate-400">Evaluating semantics...</div>';
+                    
+                    setStatus('Evaluating', 'loading');
+                    
+                    const evalPayload = {
+                        ocr_text: extractData.ocr_text,
+                        questions: extractData.questions,
+                        grading_mode: extractData.grading_mode,
+                        exam_max_marks: examMaxMarks.value.trim(),
+                        student_id: studentUSN.value.trim() || 'Unknown Student',
+                        exam_id: schemeLabel.innerText || 'Unknown Exam'
+                    };
+                    
+                    const evalRes = await fetch('/api/evaluate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(evalPayload)
+                    });
+                    const data = await evalRes.json();
+                    
+                    if(!evalRes.ok) throw new Error(data.error || "Evaluation failed");
+                    
+                    setStatus('Complete', 'success');
+                    
+                    const usnVal = studentUSN.value.trim();
+                    renderDetailedReport(usnVal || 'Single Student', data, extractData.ocr_text);
+                    
+                } catch(e) {
+                    alert("Error: " + e.message);
+                    setStatus('Failed', 'error');
+                    emptyResults.classList.remove('hidden');
+                } finally {
+                    btnRun.disabled = false;
+                    btnRun.innerHTML = '<span>Evaluate Now</span><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
+                    btnRun.classList.remove('opacity-70', 'cursor-not-allowed');
+                }
+            } else {
+                // Batch Mode!
+                const pdfFiles = Array.from(fileFolderInput.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+                if (pdfFiles.length === 0) {
+                    alert("Please select a folder containing student PDF answer sheets.");
+                    return;
                 }
                 
-                rawOcrText.innerText = extractData.ocr_text;
-                reportContent.classList.remove('hidden');
-                totalScore.innerText = '-';
-                totalMaxMarksElem.innerText = '/ -';
-                questionsList.innerHTML = '<div class="py-12 text-center text-sm font-medium text-slate-500 dark:text-slate-400">Evaluating semantics...</div>';
+                btnRun.disabled = true;
+                btnRun.classList.add('opacity-70', 'cursor-not-allowed');
+                emptyResults.classList.add('hidden');
+                reportContent.classList.add('hidden');
+                batchReportContent.classList.remove('hidden');
                 
-                setStatus('Evaluating', 'loading');
-                
-                const evalPayload = {
-                    ocr_text: extractData.ocr_text,
-                    questions: extractData.questions,
-                    grading_mode: gradingMode.value, // Read CURRENT dropdown value
-                    exam_max_marks: examMaxMarks.value.trim()
-                };
-                
-                const evalRes = await fetch('/api/evaluate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(evalPayload)
-                });
-                const data = await evalRes.json();
-                
-                if(!evalRes.ok) throw new Error(data.error || "Evaluation failed");
-                
-                setStatus('Complete', 'success');
-                
-                if (studentUSN.value.trim() !== '') {
-                    displayUSN.classList.remove('hidden');
-                    displayUSN.querySelector('span').innerText = studentUSN.value.trim();
-                } else {
-                    displayUSN.classList.add('hidden');
-                }
-                
-                totalScore.innerText = data.total_score;
-                totalMaxMarksElem.innerText = '/ ' + data.total_max;
-                
-                questionsList.innerHTML = '';
-                
-                data.results.forEach(res => {
-                    let penaltyHtml = '';
-                    if(res.penalty > 0) {
-                        penaltyHtml = '<span class="text-[10px] font-bold text-red-600 dark:text-red-400 ml-3 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase">Penalty</span>';
-                    }
-                    
-                    let traceHtml = '';
-                    if (res.trace && res.trace.length > 0) {
-                        traceHtml = res.trace.map(t => {
-                            let icon = t.status === 'success' ? '<span class="text-blue-500 dark:text-orange-500 mr-2">✓</span>' : (t.status === 'warning' ? '<span class="text-amber-500 mr-2">!</span>' : '<span class="text-red-500 mr-2">✗</span>');
-                            return '<div class="flex items-start mb-2">' + icon + '<span class="text-slate-600 dark:text-slate-300 font-medium">' + t.msg + '</span></div>';
-                        }).join('');
-                    } else {
-                        traceHtml = '<div class="text-slate-500 dark:text-slate-400 font-medium">' + res.reasoning + '</div>';
-                    }
-                    
-                    let answerText = res.extracted_answer ? res.extracted_answer : 'No answer provided';
-                    
-                    const html = '<div class="bg-white dark:bg-[#121B3A] border-y border-r border-slate-100 dark:border-y-[#1E2954] dark:border-r-[#1E2954] border-l-4 border-l-blue-500 dark:border-l-orange-500 rounded-2xl overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-lg dark:shadow-black/50 hover:shadow-xl hover:shadow-blue-500/10 hover:dark:shadow-orange-500/20 transition-shadow duration-300">' +
-                        '<div class="p-6 border-b border-slate-100 dark:border-[#1E2954] bg-slate-50/50 dark:bg-[#0B0B2A]/50 flex flex-col md:flex-row justify-between items-start gap-4">' +
-                            '<div class="flex-1">' +
-                                '<div class="flex items-center mb-2">' +
-                                    '<span class="w-8 h-8 rounded-full bg-blue-100 dark:bg-orange-500/20 text-blue-600 dark:text-orange-500 flex items-center justify-center text-xs font-bold mr-3">Q' + res.q_num + '</span>' +
-                                    penaltyHtml +
-                                '</div>' +
-                                '<h4 class="text-base font-semibold text-slate-800 dark:text-white leading-snug">' + res.question + '</h4>' +
-                            '</div>' +
-                            '<div class="text-left md:text-right shrink-0 mt-2 md:mt-0">' +
-                                '<div class="text-3xl font-black text-slate-900 dark:text-white">' + res.score + '<span class="text-sm font-semibold text-slate-400 dark:text-slate-500 ml-1">/ ' + res.max_marks + '</span></div>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="details-section p-6 space-y-6">' +
-                            '<div>' +
-                                '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Student Transcript</h5>' +
-                                '<div class="bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl text-sm text-slate-700 dark:text-slate-300 font-medium italic leading-relaxed tracking-wide shadow-inner border border-slate-200/60 dark:border-none">' +
-                                    '"' + answerText + '"' +
-                                '</div>' +
-                            '</div>' +
-                            '<div>' +
-                                '<h5 class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 flex items-center"><svg class="w-4 h-4 mr-1.5 text-blue-500 dark:text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 012-2h2a2 2 0 012 2"></path></svg>Evaluation Trace (Review)</h5>' +
-                                '<div class="text-sm bg-slate-100 dark:bg-[#0B0B2A] p-5 rounded-xl shadow-inner border border-slate-200/60 dark:border-none">' +
-                                    traceHtml +
-                                '</div>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>';
-                    questionsList.insertAdjacentHTML('beforeend', html);
-                });
-                
-                // Expand to full width by default when generated!
+                // Transition UI to full width Gradebook dashboard immediately for a spacious classroom overview
+                viewState = 'gradebook';
                 showDetailedView();
                 
-            } catch(e) {
-                alert("Error: " + e.message);
-                setStatus('Failed', 'error');
-                emptyResults.classList.remove('hidden');
-            } finally {
+                const batchGradebookList = document.getElementById('batchGradebookList');
+                batchGradebookList.innerHTML = '';
+                batchResults = {};
+                
+                for (let k = 0; k < pdfFiles.length; k++) {
+                    const file = pdfFiles[k];
+                    const usn = file.name.substring(0, file.name.lastIndexOf('.')) || 'Student ' + (k + 1);
+                    
+                    setStatus(`Grading ${k + 1}/${pdfFiles.length} (${usn})`, 'loading');
+                    btnRun.innerHTML = `Grading ${k + 1}/${pdfFiles.length}...`;
+                    
+                    // Create visual pending row
+                    const rowId = `row_${usn.replace(/\s+/g, '_')}`;
+                    const pendingRowHtml = `<tr id="${rowId}">` +
+                        `<td class="px-6 py-4 font-bold text-slate-800 dark:text-white">${usn}</td>` +
+                        `<td class="px-6 py-4 text-slate-500 font-medium">-</td>` +
+                        `<td class="px-6 py-4"><span class="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold animate-pulse">Running</span></td>` +
+                        `<td class="px-6 py-4 text-right">-</td>` +
+                    `</tr>`;
+                    batchGradebookList.insertAdjacentHTML('beforeend', pendingRowHtml);
+                    
+                    try {
+                        const formData = new FormData();
+                        if (standardizedBlob) {
+                            formData.append('scheme', standardizedBlob, schemeLabel.innerText);
+                        } else {
+                            formData.append('scheme', fileScheme.files[0]);
+                        }
+                        formData.append('student_pdf', file);
+                        formData.append('grading_mode', gradingMode.value);
+                        if (examMaxMarks.value.trim() !== '') {
+                            formData.append('exam_max_marks', examMaxMarks.value.trim());
+                        }
+                        
+                        const extractRes = await fetch('/api/extract', { method: 'POST', body: formData });
+                        const extractData = await extractRes.json();
+                        if(!extractRes.ok) throw new Error(extractData.error || "Extraction failed");
+                        
+                        const evalPayload = {
+                            ocr_text: extractData.ocr_text,
+                            questions: extractData.questions,
+                            grading_mode: extractData.grading_mode,
+                            exam_max_marks: examMaxMarks.value.trim(),
+                            student_id: usn,
+                            exam_id: schemeLabel.innerText || 'Unknown Exam'
+                        };
+                        
+                        const evalRes = await fetch('/api/evaluate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(evalPayload)
+                        });
+                        const data = await evalRes.json();
+                        if(!evalRes.ok) throw new Error(data.error || "Evaluation failed");
+                        
+                        // Save in local state
+                        batchResults[usn] = { data: data, ocrText: extractData.ocr_text };
+                        
+                        // Update visual row to graded
+                        const row = document.getElementById(rowId);
+                        row.innerHTML = `<td class="px-6 py-4 font-bold text-slate-800 dark:text-white">${usn}</td>` +
+                            `<td class="px-6 py-4 text-slate-900 dark:text-slate-300 font-extrabold">${data.total_score} / ${data.total_max}</td>` +
+                            `<td class="px-6 py-4"><span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold uppercase tracking-wider">Graded</span></td>` +
+                            `<td class="px-6 py-4 text-right space-x-2">` +
+                                `<button onclick="viewStudentDetails('${usn}')" class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-[#1E2954] text-blue-600 dark:text-orange-400 text-xs font-bold rounded-lg transition">🔍 View</button>` +
+                                `<button onclick="downloadStudentPDF('${usn}')" class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold rounded-lg transition">📥 Export PDF</button>` +
+                            `</td>`;
+                            
+                    } catch(err) {
+                        console.error(err);
+                        const row = document.getElementById(rowId);
+                        row.innerHTML = `<td class="px-6 py-4 font-bold text-red-500">${usn}</td>` +
+                            `<td class="px-6 py-4 text-slate-500">-</td>` +
+                            `<td class="px-6 py-4"><span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold uppercase">Failed</span></td>` +
+                            `<td class="px-6 py-4 text-right text-xs text-red-500 font-medium">${err.message.substring(0, 30)}</td>`;
+                    }
+                }
+                
+                setStatus('Batch Evaluation Complete', 'success');
                 btnRun.disabled = false;
                 btnRun.innerHTML = '<span>Evaluate Now</span><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
                 btnRun.classList.remove('opacity-70', 'cursor-not-allowed');

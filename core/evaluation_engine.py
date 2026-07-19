@@ -10,15 +10,25 @@ class HandwrittenEvaluator:
         self.ideal_embedding_cache = {}
         self.rubric_sentences_cache = {}
 
-    def _evaluate_exact(self, student_answer: str, ideal_answer: str):
+    def _evaluate_exact(self, student_answer: str, ideal_answer: str, grading_mode: str = 'experienced'):
         ideal_words = set(re.findall(r'\w+', ideal_answer.lower()))
         student_words = set(re.findall(r'\w+', student_answer.lower()))
         if not ideal_words: return 1.0
         matches = ideal_words.intersection(student_words)
         score = len(matches) / len(ideal_words)
-        return min(1.0, score * 1.3)
         
-    def _evaluate_flexible(self, student_answer: str, ideal_answer: str):
+        if grading_mode == 'lenient':
+            threshold_min = 0.10
+            threshold_max = 0.50
+        else:
+            threshold_min = 0.25
+            threshold_max = 0.70
+            
+        if score < threshold_min:
+            return 0.0
+        return min(1.0, (score - threshold_min) / (threshold_max - threshold_min))
+        
+    def _evaluate_flexible(self, student_answer: str, ideal_answer: str, grading_mode: str = 'experienced'):
         if not student_answer.strip(): return 0.0
         
         # Use cache for ideal_answer embedding
@@ -28,10 +38,10 @@ class HandwrittenEvaluator:
         
         emb_student = self.embedding_model.encode(student_answer, convert_to_tensor=True)
         cosine_scores = util.cos_sim(emb_ideal, emb_student)
+        # 1. Semantic Similarity
         semantic_score = cosine_scores[0][0].item()
         
         # 2. Keyword Overlap Score (Factual Precision)
-        # Extract meaningful words (length > 3) to ignore stop words
         ideal_words = set(re.findall(r'\b\w{4,}\b', ideal_answer.lower()))
         student_words = set(re.findall(r'\b\w{4,}\b', student_answer.lower()))
         if not ideal_words:
@@ -41,27 +51,43 @@ class HandwrittenEvaluator:
             keyword_score = len(matches) / len(ideal_words)
             
         # 3. True Hybrid Calculation
-        # A good paper will have High Semantic AND High Keyword Overlap.
-        # A mediocre paper (fluff) will have High Semantic but LOW Keyword Overlap.
-        # Weighting: 50% semantic meaning, 50% technical keyword precision.
         raw_score = (semantic_score * 0.5) + (keyword_score * 0.5)
         
-        return min(1.0, raw_score * 1.4)
+        # Median Strictness Normalization Mapping:
+        if grading_mode == 'lenient':
+            threshold_min = 0.20
+            threshold_max = 0.60
+        else:
+            threshold_min = 0.40
+            threshold_max = 0.75
+            
+        if raw_score < threshold_min:
+            normalized_score = 0.0
+        elif raw_score >= threshold_max:
+            normalized_score = 1.0
+        else:
+            normalized_score = (raw_score - threshold_min) / (threshold_max - threshold_min)
+            
+        # Length-based Completeness Factor:
+        student_word_list = re.findall(r'\b\w+\b', student_answer.lower())
+        ideal_word_list = re.findall(r'\b\w+\b', ideal_answer.lower())
+        
+        if len(ideal_word_list) > 10 and grading_mode != 'lenient':
+            target_length = max(8, int(len(ideal_word_list) * 0.65))
+            length_ratio = len(student_word_list) / target_length
+            completeness_factor = min(1.0, length_ratio)
+            completeness_factor = 0.2 + 0.8 * completeness_factor
+            normalized_score = normalized_score * completeness_factor
+            
+        return normalized_score
 
     def _run_hybrid_text_eval(self, ideal_rubric, ocr_text, text_max_marks, ans_type, grading_mode='experienced'):
         if text_max_marks <= 0: return 0.0
         
         if 'programming' in ans_type.lower() or 'exact' in ans_type.lower():
-            raw_score = self._evaluate_exact(ocr_text, ideal_rubric)
+            raw_score = self._evaluate_exact(ocr_text, ideal_rubric, grading_mode)
         else:
-            raw_score = self._evaluate_flexible(ocr_text, ideal_rubric)
-            
-        # Fix for Lenient vs Experienced mode
-        if grading_mode == 'lenient':
-            if raw_score >= 0.50:
-                raw_score = 1.0 # Massive curve
-            else:
-                raw_score = min(1.0, raw_score * 1.5)
+            raw_score = self._evaluate_flexible(ocr_text, ideal_rubric, grading_mode)
                 
         return raw_score
 
@@ -143,7 +169,7 @@ class HandwrittenEvaluator:
         
         # 2. Length Penalty
         length_penalty = 0.0
-        if min_length and str(min_length).lower() != 'none':
+        if min_length and str(min_length).lower() != 'none' and grading_mode != 'lenient':
             student_words = set(re.findall(r'\b\w+\b', ocr_text.lower()))
             if len(student_words) < 20: 
                 length_penalty = 0.2
