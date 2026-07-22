@@ -37,6 +37,11 @@ db_manager = DatabaseManager(os.path.join(BASE_DIR, "data", "analytics.db"))
 
 scheme_parser = SchemeParser()
 
+# Global dictionary to track batch jobs for SSE progress updates
+import threading
+batch_jobs = {}
+import uuid
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -163,6 +168,10 @@ def evaluate_exam():
         student_id = data.get('student_id', 'Unknown Student')
         exam_id = data.get('exam_id', 'Unknown Exam')
         
+        semester = data.get('semester')
+        subject = data.get('subject')
+        subject_code = data.get('subject_code')
+        
         if not ocr_text or not questions:
             return jsonify({'error': 'Missing ocr_text or questions in payload'}), 400
             
@@ -273,7 +282,10 @@ def evaluate_exam():
             total_score=total_score,
             total_max=total_max,
             grading_mode=grading_mode,
-            results=results
+            results=results,
+            semester=semester,
+            subject=subject,
+            subject_code=subject_code
         )
             
         return jsonify({
@@ -314,34 +326,28 @@ def export_csv():
     from flask import Response
     exam_id = request.args.get('exam_id')
     try:
-        conn = db_manager._get_conn()
-        cursor = conn.cursor()
-        
-        query_filter = "WHERE exam_id = ?" if exam_id else ""
-        params = (exam_id,) if exam_id else ()
-        
-        cursor.execute(f'''
-            SELECT student_id, exam_id, total_score, total_max, grading_mode, created_at
-            FROM (
-                SELECT *, ROW_NUMBER() OVER(PARTITION BY student_id ORDER BY created_at DESC) as rn
-                FROM evaluations
-                {query_filter}
+        data = db_manager.get_export_data(exam_id)
+        if not data:
+            # Return an empty CSV with headers if no data
+            return Response(
+                "Student ID,Exam ID,Total Score,Max Marks,Percentage,Grading Mode,Date\n",
+                mimetype="text/csv",
+                headers={"Content-disposition": "attachment; filename=gradebook_export.csv"}
             )
-            WHERE rn = 1
-            ORDER BY student_id ASC
-        ''', params)
-        
-        rows = cursor.fetchall()
-        conn.close()
+            
+        all_keys = set()
+        for row in data:
+            all_keys.update(row.keys())
+            
+        base_cols = ["Student ID", "Exam ID", "Semester", "Subject", "Subject Code", "Total Score", "Max Marks", "Percentage", "Grading Mode", "Date"]
+        q_cols = sorted([k for k in all_keys if k.startswith('Q') and k.endswith('Score')], key=lambda x: int(x[1:].split()[0]))
+        fieldnames = base_cols + q_cols
         
         output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['Student ID', 'Exam ID', 'Total Score', 'Max Score', 'Percentage', 'Grading Mode', 'Date'])
-        
-        for row in rows:
-            student_id, eid, score, max_score, mode, date = row
-            pct = round((score / max_score * 100), 2) if max_score > 0 else 0
-            writer.writerow([student_id, eid, score, max_score, f"{pct}%", mode, date])
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in data:
+            writer.writerow(row)
             
         return Response(
             output.getvalue(),
@@ -363,6 +369,180 @@ def get_analytics():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/flagged_reviews', methods=['GET'])
+def get_flagged_reviews():
+    try:
+        reviews = db_manager.get_flagged_reviews()
+        return jsonify(reviews)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+def run_batch_job(job_id, scheme_path, pdf_paths, scheme_filename, grading_mode, exam_max_marks, semester, subject, subject_code):
+    try:
+        # Parse marking scheme once
+        questions = scheme_parser.parse_scheme(scheme_path)
+        
+        batch_jobs[job_id]['total'] = len(pdf_paths)
+        
+        def process_single_pdf(pdf_path):
+            usn = os.path.splitext(os.path.basename(pdf_path))[0]
+            try:
+                # 1. OCR Extract
+                batch_jobs[job_id]['current_usn'] = usn
+                ocr_text = process_pdf(pdf_path)
+                
+                # 2. Segment
+                segmented_answers = segment_answers_with_gemini(ocr_text, questions)
+                
+                # 3. Evaluate Questions
+                results = [None] * len(questions)
+                total_score = 0
+                total_max = 0
+                
+                for i, q in enumerate(questions):
+                    q_text = q.get('question', '')
+                    ideal = q.get('answer', '')
+                    max_m = int(q.get('max_marks', 10))
+                    ans_type = q.get('type', 'flexible').lower()
+                    min_length = q.get('min_length', None)
+                    q_key = str(q.get('id', str(i+1))).strip()
+                    
+                    student_ans = segmented_answers.get(q_key)
+                    if not student_ans:
+                        student_ans = segmented_answers.get(f"Q{q_key}")
+                    if not student_ans:
+                        student_ans = segmented_answers.get(q_key.replace("Q", ""))
+                    if not student_ans:
+                        for k, v in segmented_answers.items():
+                            if str(k).lower().strip('q') == q_key.lower().strip('q'):
+                                student_ans = v
+                                break
+                    student_ans = (student_ans or "").strip()
+                    
+                    if not student_ans or len(student_ans) < 5:
+                        results[i] = {
+                            'q_num': i+1, 'question': q_text, 'max_marks': max_m,
+                            'type': ans_type.upper(), 'score': 0, 'reasoning': 'Not attempted.',
+                            'match': 0, 'penalty': 0, 'extracted_answer': 'Not Attempted', 'needs_review': False
+                        }
+                    else:
+                        eval_result = evaluator.evaluate(
+                            question=q_text, ideal_rubric=ideal, ocr_text=student_ans,
+                            max_marks=max_m, ans_type=ans_type, components=q.get('components', {}),
+                            min_length=min_length, grading_mode=grading_mode
+                        )
+                        results[i] = {
+                            'q_num': i+1, 'question': q_text, 'max_marks': max_m,
+                            'type': ans_type.upper(), 'score': eval_result['score'],
+                            'reasoning': eval_result['reasoning'], 'match': eval_result['match_percentage'],
+                            'penalty': eval_result['penalty'], 'extracted_answer': student_ans,
+                            'needs_review': eval_result['match_percentage'] < 0.35,
+                            'trace': eval_result.get('trace', [])
+                        }
+                    
+                    total_score += results[i]['score']
+                    total_max += max_m
+                
+                if exam_max_marks: total_max = int(exam_max_marks)
+                
+                # 4. Save to DB
+                evaluation_id = db_manager.save_evaluation(
+                    exam_id=scheme_filename, student_id=usn, total_score=total_score,
+                    total_max=total_max, grading_mode=grading_mode, results=results,
+                    semester=semester, subject=subject, subject_code=subject_code
+                )
+                
+                # Update progress
+                batch_jobs[job_id]['completed'] += 1
+                batch_jobs[job_id]['results'].append({
+                    'usn': usn, 'total_score': total_score, 'total_max': total_max, 
+                    'evaluation_id': evaluation_id, 'data': {'results': results, 'total_score': total_score, 'total_max': total_max}
+                })
+            except Exception as e:
+                batch_jobs[job_id]['completed'] += 1
+                batch_jobs[job_id]['errors'].append({'usn': usn, 'error': str(e)})
+                traceback.print_exc()
+
+        # Execute parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            executor.map(process_single_pdf, pdf_paths)
+            
+        batch_jobs[job_id]['status'] = 'completed'
+    except Exception as e:
+        batch_jobs[job_id]['status'] = 'failed'
+        batch_jobs[job_id]['error'] = str(e)
+        traceback.print_exc()
+
+@app.route('/api/evaluate_batch_start', methods=['POST'])
+def evaluate_batch_start():
+    if 'scheme' not in request.files:
+        return jsonify({'error': 'Missing scheme file'}), 400
+        
+    scheme_file = request.files['scheme']
+    pdf_files = request.files.getlist('student_pdfs')
+    
+    if not pdf_files or len(pdf_files) == 0:
+        return jsonify({'error': 'Missing PDF files'}), 400
+        
+    job_id = str(uuid.uuid4())
+    job_dir = os.path.join(app.config['UPLOAD_FOLDER'], job_id)
+    os.makedirs(job_dir, exist_ok=True)
+    
+    scheme_path = os.path.join(job_dir, secure_filename(scheme_file.filename))
+    scheme_file.save(scheme_path)
+    
+    pdf_paths = []
+    for pdf in pdf_files:
+        pdf_path = os.path.join(job_dir, secure_filename(pdf.filename))
+        pdf.save(pdf_path)
+        pdf_paths.append(pdf_path)
+        
+    grading_mode = request.form.get('grading_mode', 'experienced')
+    exam_max_marks = request.form.get('exam_max_marks')
+    semester = request.form.get('semester')
+    subject = request.form.get('subject')
+    subject_code = request.form.get('subject_code')
+    
+    batch_jobs[job_id] = {
+        'status': 'running',
+        'total': len(pdf_paths),
+        'completed': 0,
+        'current_usn': '',
+        'results': [],
+        'errors': []
+    }
+    
+    thread = threading.Thread(
+        target=run_batch_job, 
+        args=(job_id, scheme_path, pdf_paths, scheme_file.filename, grading_mode, exam_max_marks, semester, subject, subject_code)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({'success': True, 'job_id': job_id})
+
+@app.route('/api/batch_progress/<job_id>', methods=['GET'])
+def batch_progress(job_id):
+    from flask import Response
+    
+    def generate():
+        while True:
+            if job_id not in batch_jobs:
+                yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
+                break
+                
+            job = batch_jobs[job_id]
+            yield f"data: {json.dumps(job)}\n\n"
+            
+            if job['status'] in ['completed', 'failed']:
+                break
+                
+            time.sleep(1.0)
+            
+    return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     # Start web server on port 5000. 

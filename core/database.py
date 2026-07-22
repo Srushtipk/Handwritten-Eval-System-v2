@@ -50,10 +50,23 @@ class DatabaseManager:
         except sqlite3.OperationalError:
             pass # Columns already exist
             
+        try:
+            cursor.execute("ALTER TABLE question_scores ADD COLUMN reasoning TEXT")
+            cursor.execute("ALTER TABLE question_scores ADD COLUMN extracted_answer TEXT")
+        except sqlite3.OperationalError:
+            pass
+            
+        try:
+            cursor.execute("ALTER TABLE evaluations ADD COLUMN semester TEXT")
+            cursor.execute("ALTER TABLE evaluations ADD COLUMN subject TEXT")
+            cursor.execute("ALTER TABLE evaluations ADD COLUMN subject_code TEXT")
+        except sqlite3.OperationalError:
+            pass
+            
         conn.commit()
         conn.close()
 
-    def save_evaluation(self, exam_id, student_id, total_score, total_max, grading_mode, results):
+    def save_evaluation(self, exam_id, student_id, total_score, total_max, grading_mode, results, semester=None, subject=None, subject_code=None):
         """
         Saves a single student's evaluation to the database.
         results is a list of question result dicts.
@@ -63,9 +76,9 @@ class DatabaseManager:
         
         # 1. Insert evaluation
         cursor.execute('''
-            INSERT INTO evaluations (exam_id, student_id, total_score, total_max, grading_mode)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (exam_id, student_id, total_score, total_max, grading_mode))
+            INSERT INTO evaluations (exam_id, student_id, total_score, total_max, grading_mode, semester, subject, subject_code)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (exam_id, student_id, total_score, total_max, grading_mode, semester, subject, subject_code))
         
         evaluation_id = cursor.lastrowid
         
@@ -73,8 +86,11 @@ class DatabaseManager:
         for res in results:
             if not res: continue
             cursor.execute('''
-                INSERT INTO question_scores (evaluation_id, q_num, question_text, score, max_marks, match_percentage, needs_review)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO question_scores (
+                    evaluation_id, q_num, question_text, score, max_marks, 
+                    match_percentage, needs_review, reasoning, extracted_answer
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 evaluation_id,
                 res.get('q_num', 0),
@@ -82,7 +98,9 @@ class DatabaseManager:
                 res.get('score', 0),
                 res.get('max_marks', 0),
                 res.get('match', 0.0),
-                1 if res.get('needs_review') else 0
+                1 if res.get('needs_review') else 0,
+                res.get('reasoning', ''),
+                res.get('extracted_answer', '')
             ))
             
         conn.commit()
@@ -209,3 +227,89 @@ class DatabaseManager:
                 for row in questions_row
             ]
         }
+
+    def get_export_data(self, exam_id=None):
+        """
+        Returns flat data for CSV export. Each row is a student's evaluation,
+        with columns for Student ID, Exam ID, Total Score, Max Marks, Date, and individual question scores.
+        """
+        conn = self._get_conn()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        query_filter = "WHERE e.exam_id = ?" if exam_id else ""
+        params = (exam_id,) if exam_id else ()
+        
+        # Get evaluations
+        cursor.execute(f'''
+            SELECT id, exam_id, student_id, total_score, total_max, grading_mode, semester, subject, subject_code, created_at
+            FROM evaluations e
+            {query_filter}
+            ORDER BY created_at DESC
+        ''', params)
+        evaluations = cursor.fetchall()
+        
+        export_data = []
+        for eval_row in evaluations:
+            eval_id = eval_row['id']
+            base_dict = {
+                "Student ID": eval_row['student_id'],
+                "Exam ID": eval_row['exam_id'],
+                "Semester": eval_row['semester'] or "",
+                "Subject": eval_row['subject'] or "",
+                "Subject Code": eval_row['subject_code'] or "",
+                "Total Score": eval_row['total_score'],
+                "Max Marks": eval_row['total_max'],
+                "Percentage": f"{round((eval_row['total_score'] / eval_row['total_max']) * 100, 1)}%" if eval_row['total_max'] > 0 else "0%",
+                "Grading Mode": eval_row['grading_mode'],
+                "Date": eval_row['created_at']
+            }
+            
+            # Fetch question scores
+            cursor.execute('''
+                SELECT q_num, score, max_marks
+                FROM question_scores
+                WHERE evaluation_id = ?
+                ORDER BY q_num ASC
+            ''', (eval_id,))
+            q_scores = cursor.fetchall()
+            
+            for q in q_scores:
+                base_dict[f"Q{q['q_num']} Score"] = f"{q['score']}/{q['max_marks']}"
+                
+            export_data.append(base_dict)
+            
+        conn.close()
+        return export_data
+
+    def get_flagged_reviews(self):
+        """Returns all questions that were flagged by the AI for manual review."""
+        conn = self._get_conn()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT 
+                q.id as question_id,
+                q.evaluation_id,
+                q.q_num,
+                q.question_text,
+                q.score,
+                q.max_marks,
+                q.match_percentage,
+                q.reasoning,
+                q.extracted_answer,
+                e.student_id,
+                e.exam_id,
+                e.semester,
+                e.subject
+            FROM question_scores q
+            JOIN evaluations e ON q.evaluation_id = e.id
+            WHERE q.needs_review = 1
+            ORDER BY e.created_at DESC
+        ''')
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
