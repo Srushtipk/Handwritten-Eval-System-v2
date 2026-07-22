@@ -12,38 +12,61 @@ class SchemeParser:
     def __init__(self):
         pass
         
-    def parse_scheme(self, docx_path):
+    def parse_scheme(self, file_path):
         """
-        Parses a DOCX marking scheme and returns a list of question dictionaries.
-        Expected format:
-        Question: ...
-        Max Marks: ...
-        Type: Flexible/Exact
-        Min Length: ... (optional)
-        Answer: ...
+        Parses a marking scheme (DOCX, PDF, CSV, XLS, XLSX) and returns a list of question dictionaries.
         """
-        doc = docx.Document(docx_path)
+        ext = os.path.splitext(file_path)[1].lower()
         
-        questions = []
-        current_question = {}
-        
-        # We will attempt two parsing strategies.
-        # Strategy 1: The standard format (Question: / Max Marks: / Answer:)
-        questions = self._parse_standard_format(doc)
-        
-        # Strategy 2: The Academic format (Q1 a) ... / Marks Allotted: ... )
-        if not questions:
-            questions = self._parse_academic_format(doc)
+        if ext in ['.doc', '.docx']:
+            doc = docx.Document(file_path)
             
-        # Strategy 3: Tabular format (Q. No | Sub | Text | Marks)
-        if not questions:
-            questions = self._parse_table_format(doc)
+            questions = []
             
-        # Strategy 4: The Gemini LLM Fallback (for messy unstructured rubrics)
-        if not questions and api_key:
-            questions = self._parse_with_gemini(doc)
+            # Strategy 1: The standard format (Question: / Max Marks: / Answer:)
+            questions = self._parse_standard_format(doc)
             
-        return questions
+            # Strategy 2: The Academic format (Q1 a) ... / Marks Allotted: ... )
+            if not questions:
+                questions = self._parse_academic_format(doc)
+                
+            # Strategy 3: Tabular format (Q. No | Sub | Text | Marks)
+            if not questions:
+                questions = self._parse_table_format(doc)
+                
+            # Strategy 4: The Gemini LLM Fallback (for messy unstructured rubrics)
+            if not questions and api_key:
+                questions = self._parse_with_gemini(doc)
+                
+            return questions
+        else:
+            # Fallback for PDF, CSV, Excel using Gemini
+            if not api_key:
+                print("Gemini API key is required to parse PDF/CSV/Excel schemes.")
+                return []
+                
+            text = ""
+            try:
+                if ext == '.pdf':
+                    import fitz
+                    pdf_doc = fitz.open(file_path)
+                    for page in pdf_doc:
+                        text += page.get_text() + "\n"
+                elif ext == '.csv':
+                    import pandas as pd
+                    df = pd.read_csv(file_path)
+                    text = df.to_string()
+                elif ext in ['.xls', '.xlsx']:
+                    import pandas as pd
+                    df = pd.read_excel(file_path)
+                    text = df.to_string()
+                else:
+                    return []
+            except Exception as e:
+                print(f"Error extracting text from {ext} file: {e}")
+                return []
+                
+            return self._parse_with_gemini(text)
         
     def _extract_all_text_blocks(self, doc):
         blocks = []
@@ -96,10 +119,13 @@ class SchemeParser:
                         })
         return questions
         
-    def _parse_with_gemini(self, doc):
-        """Uses Gemini to intelligently extract questions and answers from a messy DOCX."""
+    def _parse_with_gemini(self, input_data):
+        """Uses Gemini to intelligently extract questions and answers from a messy input."""
         print("Regex parsers failed. Engaging Gemini LLM fallback for scheme extraction...")
-        full_text = "\n".join(self._extract_all_text_blocks(doc))
+        if isinstance(input_data, str):
+            full_text = input_data
+        else:
+            full_text = "\n".join(self._extract_all_text_blocks(input_data))
         
         prompt = (
             "You are an expert exam evaluator parsing a university marking scheme/rubric.\n"
